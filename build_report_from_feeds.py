@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-# Weekly report builder - ZERO API INSIGHTS
-# - strict pass + relaxed fallback if too few items
-# - fetch & extract article text (readability)
-# - keyphrase extraction (YAKE) -> insight sentences (no boilerplate)
-# - TL;DR & Deltas computed from items (no LLM)
-# - de-duplication, HTTP 200 checks, MM/DD dates, no Tag column
+# Weekly report builder (no paid LLM)
+# - Follows redirects to final URLs (drops Google News links)
+# - Strong de-dupe by title + content similarity
+# - Insights/TL;DR/Actions from extracted page text (readability + YAKE)
+# - Dates MM/DD, no Tag column
 
-import os, sys, re, html, json, collections
+import os, sys, re, html, json, difflib, hashlib, collections
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit, parse_qs
 import requests, feedparser, yaml
 from dateutil import parser as dtp
 from readability import Document
 from bs4 import BeautifulSoup
 import yake
 
+# ---- config/env
 OUTPUT_HTML   = os.environ.get("OUTPUT_HTML", "report.html")
 CONF_PATH     = os.environ.get("NEWS_FEEDS_CONFIG", "config/news_feeds.yaml")
 MIN_ITEMS     = int(os.environ.get("MIN_ITEMS", "4"))
@@ -27,50 +27,16 @@ S = requests.Session()
 S.headers.update({"User-Agent": UA, "Referer": "https://github.com/replicarivals/workflow"})
 TIMEOUT = 25
 
-# ---------------- YAML / HTTP helpers ----------------
-
+# ---- helpers
 def load_conf(path):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
-def norm_url(u: str) -> str:
-    if not u: return ""
-    u = re.sub(r"(\?|&)(utm_[^=]+|fbclid|gclid)=[^&#]+", "", u, flags=re.I)
-    u = re.sub(r"[?&]$", "", u)
-    return u
-
-def http_ok(url: str) -> bool:
-    try:
-        r = S.get(url, allow_redirects=True, timeout=TIMEOUT)
-        return 200 <= r.status_code < 400
-    except Exception:
-        return False
-
-def within_window(dt: datetime, days: int) -> bool:
-    now = datetime.now(timezone.utc)
-    return (now - dt).total_seconds() <= days * 86400 + 3600  # +1h grace
-
-def parse_date(entry):
-    for field in ("published", "updated"):
-        val = entry.get(field)
-        if val:
-            try:
-                return dtp.parse(val).astimezone(timezone.utc)
-            except Exception:
-                pass
-    for field in ("published_parsed", "updated_parsed"):
-        val = getattr(entry, field, None)
-        if val:
-            try:
-                return datetime(*val[:6], tzinfo=timezone.utc)
-            except Exception:
-                pass
-    return datetime.now(timezone.utc)
-
 def domain(u: str) -> str:
     try:
         host = urlparse(u).netloc.lower()
-        return ".".join(host.split(".")[-2:])
+        parts = host.split(".")
+        return ".".join(parts[-2:]) if len(parts) >= 2 else host
     except Exception:
         return ""
 
@@ -80,8 +46,77 @@ def path(u: str) -> str:
     except Exception:
         return "/"
 
-# ---------------- Theming / categorization ----------------
+def norm_url(u: str) -> str:
+    if not u: return ""
+    # unwrap Google News redirect if present
+    if "news.google.com" in u:
+        q = parse_qs(urlsplit(u).query)
+        if "url" in q and q["url"]:
+            u = q["url"][0]
+    # strip UTMs etc.
+    u = re.sub(r"(\?|&)(utm_[^=]+|fbclid|gclid)=[^&#]+", "", u, flags=re.I)
+    u = re.sub(r"[?&]$", "", u)
+    return u
 
+def fetch_final(url: str):
+    """Return (final_url, status_code, text) after redirects (or (url, code, '') on failure)."""
+    try:
+        r = S.get(url, allow_redirects=True, timeout=TIMEOUT)
+        final = r.url
+        # unwrap Google News even if redirected through it
+        final = norm_url(final)
+        return final, r.status_code, r.text if 200 <= r.status_code < 400 else ""
+    except Exception:
+        return url, 0, ""
+
+def http_ok(url: str) -> bool:
+    _, code, _ = fetch_final(url)
+    return 200 <= code < 400
+
+def within_window(dt: datetime, days: int) -> bool:
+    now = datetime.now(timezone.utc)
+    return (now - dt).total_seconds() <= days * 86400 + 3600
+
+def parse_date(entry):
+    for field in ("published", "updated"):
+        val = entry.get(field)
+        if val:
+            try: return dtp.parse(val).astimezone(timezone.utc)
+            except Exception: pass
+    for field in ("published_parsed", "updated_parsed"):
+        val = getattr(entry, field, None)
+        if val:
+            try: return datetime(*val[:6], tzinfo=timezone.utc)
+            except Exception: pass
+    return datetime.now(timezone.utc)
+
+def clean_text(html_text: str) -> str:
+    if not html_text: return ""
+    doc = Document(html_text)
+    html_body = doc.summary()
+    soup = BeautifulSoup(html_body, "html.parser")
+    for tag in soup(["script","style","nav","code","pre","aside","figure","figcaption"]):
+        tag.decompose()
+    text = soup.get_text(" ", strip=True)
+    return re.sub(r"\s+", " ", text).strip()
+
+def short_hash(s: str) -> str:
+    return hashlib.sha1(s.encode("utf-8", "ignore")).hexdigest()[:10]
+
+_yake = yake.KeywordExtractor(lan="en", n=1, top=12)
+def key_phrases(text: str):
+    try:
+        kws = [w for (w,score) in _yake.extract_keywords(text)]
+        seen=set(); out=[]
+        for k in kws:
+            k = k.strip().lower()
+            if k and k not in seen:
+                out.append(k); seen.add(k)
+        return out[:10]
+    except Exception:
+        return []
+
+# ---- categorize
 def pick_theme(title, summary, hints):
     t = f"{title} {summary}".lower()
     if any(k.lower() in t for k in hints.get("regulatory", [])): return "Regulatory"
@@ -89,10 +124,10 @@ def pick_theme(title, summary, hints):
     if any(k.lower() in t for k in hints.get("product", [])):   return "Product"
     return "FYI"
 
-# ---------------- Harvest (strict -> relaxed) ----------------
-
+# ---- rule filters
 def allowed_by_rules(u: str, allowed_domains: set, allowed_prefixes: dict, excludes: list, strict: bool) -> bool:
-    if any(x in u for x in excludes):
+    u_low = u.lower()
+    if any(x in u_low for x in excludes):
         return False
     if not strict:
         return True
@@ -112,6 +147,7 @@ def soft_keyword_match(blob: str, kws: list[str]) -> bool:
     tokens = [t for k in kws for t in re.split(r"\W+", k.lower()) if t]
     return any(t and t in b for t in tokens)
 
+# ---- harvest (strict -> relaxed)
 def collect_items(cfg, strict=True, extra_days=0):
     days = int(cfg.get("window_days", 7)) + (extra_days if not strict else 0)
     allowed_domains = set(d.lower() for d in cfg.get("allowed_domains", []))
@@ -119,7 +155,7 @@ def collect_items(cfg, strict=True, extra_days=0):
     excludes = [e.lower() for e in cfg.get("exclude_patterns", [])]
     theme_hints = cfg.get("theme_hints", {})
 
-    raw, seen_urls = [], set()
+    raw, seen = [], set()
 
     def sources():
         for c in cfg.get("competitors", []):
@@ -135,7 +171,7 @@ def collect_items(cfg, strict=True, extra_days=0):
                 continue
             for e in fp.entries:
                 url = norm_url(e.get("link",""))
-                if not url or url in seen_urls: 
+                if not url or url in seen:
                     continue
                 if not allowed_by_rules(url, allowed_domains, allowed_prefixes, excludes, strict):
                     continue
@@ -148,16 +184,17 @@ def collect_items(cfg, strict=True, extra_days=0):
                 blob = f"{title} {summary}"
 
                 if strict:
-                    if kws and not any(k.lower() in blob.lower() for k in kws):
-                        continue
+                    if kws and not any(k.lower() in blob.lower() for k in kws): continue
                 else:
-                    if not soft_keyword_match(blob, kws):
-                        continue
+                    if not soft_keyword_match(blob, kws): continue
 
-                if not http_ok(url):
-                    continue
+                # Validate and resolve to final URL
+                final_url, code, html_text = fetch_final(url)
+                if not (200 <= code < 400): continue
 
-                seen_urls.add(url)
+                seen.add(url)
+                seen.add(final_url)
+
                 theme = pick_theme(title, summary, theme_hints)
                 raw.append({
                     "dt": dt,
@@ -167,124 +204,116 @@ def collect_items(cfg, strict=True, extra_days=0):
                     "theme": theme,
                     "title": title,
                     "raw_summary": summary,
-                    "url": url,
+                    "url": final_url,
+                    "_html": html_text
                 })
 
-    # De-dup across feeds/pubs — prefer first-party docs, then vendor blog/.gov, then media; keep most recent
+    # ---- strong de-dup: title normalization + content similarity
     def norm_title(t: str) -> str:
         t = t.lower()
         t = re.sub(r"[^a-z0-9 ]+", " ", t)
-        t = re.sub(r"\b(pr|press|announces|launches|introduces|releases|updated?)\b", "", t)
+        t = re.sub(r"\b(pr|press|announces?|launch(es|ed)?|introduc(es|ed)?|releases?|updated?)\b", "", t)
         t = re.sub(r"\s+", " ", t).strip()
         return t
 
-    best_by_key = {}
+    # prepare content text + small hash for fast equality
+    for it in raw:
+        text = clean_text(it["_html"])
+        it["_text"] = text
+        it["_hash"] = short_hash(text[:1000]) if text else ""
+
+    # cluster within (competitor,label) by title key; then merge by content similarity
+    clusters = {}
     for it in raw:
         key = (it["label"].lower(), it["theme"], norm_title(it["title"]))
-        d = domain(it["url"])
-        pr = 2
-        if "developers." in d or "docs" in it["url"]: pr = 0
-        elif d.startswith("blog.") or d.endswith(".gov"): pr = 1
-        score = (pr, -int(it["dt"].timestamp()))
-        if key not in best_by_key or score < best_by_key[key]["_score"]:
-            v = it.copy(); v["_score"] = score
-            best_by_key[key] = v
+        clusters.setdefault(key, []).append(it)
 
-    items = list(best_by_key.values())
-    items.sort(key=lambda x: (x["dt"], x["label"]), reverse=True)
-    return items
+    deduped = []
+    for key, items in clusters.items():
+        # sort by (first-party/docs) then recency
+        def pref_score(u):
+            d = domain(u)
+            if "developers." in d or "docs" in u: return 0
+            if d.startswith("blog.") or d.endswith(".gov"): return 1
+            return 2
+        items.sort(key=lambda x: (pref_score(x["url"]), -int(x["dt"].timestamp())))
+        kept = []
+        for cand in items:
+            dup = False
+            for k in kept:
+                # if content hashes match OR high similarity on text/title -> drop as duplicate
+                if cand["_hash"] and cand["_hash"] == k["_hash"]:
+                    dup = True; break
+                if cand["_text"] and k["_text"]:
+                    if difflib.SequenceMatcher(None, cand["_text"][:1500], k["_text"][:1500]).ratio() > 0.90:
+                        dup = True; break
+                if difflib.SequenceMatcher(None, norm_title(cand["title"]), norm_title(k["title"])).ratio() > 0.92:
+                    dup = True; break
+            if not dup:
+                kept.append(cand)
+        # keep the best one
+        if kept:
+            best = kept[0]
+            deduped.append(best)
 
-# ---------------- Content extraction & insights (NO LLM) ----------------
+    # final sort recent first
+    deduped.sort(key=lambda x: (x["dt"], x["label"]), reverse=True)
+    return deduped
 
-def fetch_main_text(url: str) -> str:
-    """Extract main article text using readability + bs4; fall back to text/html stripping."""
-    try:
-        r = S.get(url, timeout=TIMEOUT)
-        r.raise_for_status()
-        doc = Document(r.text)
-        html_body = doc.summary()
-        soup = BeautifulSoup(html_body, "html.parser")
-        # remove nav/code/figcaptions
-        for tag in soup(["script","style","nav","code","pre","aside","figure","figcaption"]):
-            tag.decompose()
-        text = soup.get_text(" ", strip=True)
-        # limit length to keep YAKE fast
-        text = re.sub(r"\s+", " ", text).strip()
-        return text[:8000]
-    except Exception:
-        return ""
-
-_yake = yake.KeywordExtractor(lan="en", n=1, top=12)
-
-def key_phrases(text: str):
-    try:
-        kws = [w for (w,score) in _yake.extract_keywords(text)]
-        # de-dup while preserving order
-        seen=set(); out=[]
-        for k in kws:
-            k = k.strip().lower()
-            if k and k not in seen:
-                out.append(k); seen.add(k)
-        return out[:10]
-    except Exception:
-        return []
-
-def insight_from_phrases(item, phrases):
-    """Compose a short insight sentence using signals from phrases + theme. 16–26 words."""
+# ---- insights from content (no LLM)
+def compose_why(item, phrases):
     label = item["label"]; theme = item["theme"]
-    # light weighting
     words = set(phrases[:6])
     def has(*ks): return any(k in words for k in ks)
-    # theme-driven templates, but filled from content keywords (no title repeat)
     if theme == "Product":
-        if has("pricing","tier","license","bundle"):
-            return f"Alters {label} deal economics; sharpen value proof and counters tied to time-to-deploy and operational privacy."
+        if has("pricing","tier","bundle","license"):
+            return f"Changes {label} deal economics; arm reps with counters and time-to-deploy proof."
         if has("policy","identity","threat","content"):
-            return f"Expands {label} policy depth; expect RFP asks for conditional isolation—position cross-team control and quick rollout."
+            return f"Signals richer policy controls; expect RFP asks for conditional isolation and fine-grained audit."
         if has("messaging","chat","mobile","byod"):
-            return f"Pushes {label} toward comms/mobile; reframe scope around unattributable access and full-stack isolation rather than chat features."
-        return f"Signals capability momentum for {label}; test impact on shortlists and address parity questions early in cycles."
+            return f"Pivots toward comms/mobile; reframe against Replica’s full-stack isolation and unattributable access."
+        return f"Shifts evaluation criteria; test shortlist impact and address parity early."
     if theme == "Docs / GTM":
-        if has("policy","zero trust","isolation","sse","bundle","packaging"):
-            return f"Indicates packaging/enablement moves; anticipate isolation bundled into Zero Trust SKUs, raising pricing pressure in enterprise deals."
-        return f"Documentation shift likely precedes GTM changes; watch for updated RFP language and buyer evaluation criteria."
+        if has("isolation","policy","zero trust","bundle","packaging","sse"):
+            return "Hints at bundling isolation inside Zero Trust SKUs; expect pricing/packaging pressure in enterprise deals."
+        return "Doc posture change usually precedes GTM moves; watch RFP language and buyer expectations."
     if theme == "Regulatory":
-        if has("cisa","kev","exploit","smb","deadline","directive"):
-            return "Creates compliance pressure and near-term triggers for isolated, auditable workflows in public sector and regulated accounts."
-        return "Raises risk visibility; expect tighter controls and shorter remediation windows across security-sensitive segments."
-    # catch-all using top phrases
+        if has("cisa","kev","exploit","deadline","directive"):
+            return "Creates compliance pressure and near-term triggers for isolated, auditable workflows."
+        return "Raises perceived risk; accelerates control adoption timelines."
+    # fallback
     top = ", ".join(list(words)[:2]) if words else "buyer criteria"
-    return f"Likely to influence {top}; integrate into talk tracks and discovery this week."
+    return f"Likely to influence {top}; fold into talk tracks this week."
 
-# ---------------- TL;DR & Deltas (NO LLM) ----------------
-
-def build_tldr(items, texts_by_idx, max_bullets=4):
+def build_tldr(items):
     if not items: return ["No material updates."]
-    # score items by theme priority + recency + content richness
+    # group by competitor, prefer Product/Docs in summary
     pri = {"Product":0,"Docs / GTM":1,"Regulatory":2,"FYI":3}
-    scored = []
-    for i,it in enumerate(items):
-        text = texts_by_idx.get(i,"")
-        richness = min(len(text)//300, 3)  # 0..3
-        scored.append((pri.get(it["theme"],9), -int(it["dt"].timestamp()), -richness, i))
-    scored.sort()
+    by_comp = collections.defaultdict(list)
+    for it in items:
+        by_comp[it["label"]].append(it)
     bullets=[]
-    for _,__,___,i in scored[:max_bullets]:
-        it = items[i]
-        why = texts_by_idx.get(i,"")
-        # compress to 18–22 words using phrases
-        phrases = key_phrases(why)[:4]
-        gist = ", ".join(phrases) if phrases else "policy, packaging, and buyer urgency"
-        if it["theme"]=="Product":
-            bullets.append(f"{it['label']}: product change shaping evaluations — {gist}.")
-        elif it["theme"]=="Docs / GTM":
-            bullets.append(f"{it['label']}: GTM/docs signal packaging shifts — {gist}.")
-        elif it["theme"]=="Regulatory":
-            bullets.append(f"Regulatory: accelerates decisions — {gist}.")
+    for comp, arr in sorted(by_comp.items(), key=lambda kv: min(pri.get(i["theme"],9) for i in kv[1])):
+        # roll up phrases across this competitor
+        phrases = []
+        for it in arr:
+            text = it.get("_text","")
+            phrases += key_phrases(text)
+        top = [p for p,_ in collections.Counter(phrases).most_common(4)]
+        gist = ", ".join(top) if top else "policy, packaging, buyer urgency"
+        theme = sorted(arr, key=lambda i: (pri.get(i["theme"],9), -int(i["dt"].timestamp())))[0]["theme"]
+        if theme=="Product":
+            bullets.append(f"{comp}: product/feature shift shaping evaluations — {gist}.")
+        elif theme=="Docs / GTM":
+            bullets.append(f"{comp}: docs/GTM signal packaging changes — {gist}.")
+        elif theme=="Regulatory":
+            bullets.append(f"Regulatory: accelerates decision timelines — {gist}.")
         else:
-            bullets.append(f"{it['label']}: notable signal — {gist}.")
+            bullets.append(f"{comp}: notable movement — {gist}.")
+        if len(bullets) >= 4: break
     return bullets
 
+# ---- deltas vs last week
 def load_prev_cache(path):
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -310,50 +339,120 @@ def build_deltas(curr, prev):
     if add_theme:
         out.append("New this week — " + ", ".join(f"{t}: +{n}" for t,n in add_theme.most_common()))
     if rem_theme:
-        out.append("Quiet this week — " + ", ".join(f"{t}: −{n}" for t,n in rem_theme.most_common()))
-    # competitor momentum
+        out.append("Quieter vs last week — " + ", ".join(f"{t}: −{n}" for t,n in rem_theme.most_common()))
     add_comp = collections.Counter([a[0] for a in added])
     if add_comp:
         comps = ", ".join(c for c,_ in add_comp.most_common(3))
-        out.append(f"Increased activity: {comps}")
+        out.append(f"Momentum: {comps}")
     if not out:
-        out.append("No major shifts vs. last week.")
+        out.append("No major shifts vs last week.")
     return out[:4]
 
-# ---------------- HTML rendering ----------------
+# ---- actions from items (no boilerplate, no Google News links)
+def best_link(items):
+    def pref(u):
+        d = domain(u)
+        if "developers." in d or "docs" in u: return 0
+        if d.startswith("blog.") or d.endswith(".gov"): return 1
+        return 2
+    return sorted(items, key=lambda it: (pref(it["url"]), -int(it["dt"].timestamp())))[0]["url"]
 
-def to_html(items, start, end, tldr, deltas, whys, texts_by_idx):
+def build_actions(items):
+    exec_actions, sales_actions, mkt_actions, prod_actions = [], [], [], []
+    if not items: return exec_actions, sales_actions, mkt_actions, prod_actions
+
+    by_theme = collections.defaultdict(list)
+    for it in items:
+        by_theme[it["theme"]].append(it)
+
+    # Exec: regulatory triggers or sizable product moves
+    if by_theme.get("Regulatory"):
+        u = best_link(by_theme["Regulatory"])
+        exec_actions.append(f"Prioritize advisory-affected accounts; approve isolated workspace pilots to hit deadlines — {u}")
+    prod_moves = [it for it in items if it["theme"]=="Product" and it["stype"]=="competitor"]
+    if prod_moves:
+        # pick top competitor and concrete link
+        u = best_link(prod_moves)
+        comps = ", ".join(sorted({i['label'] for i in prod_moves})[:3])
+        exec_actions.append(f"Fund 1–2 lighthouse head-to-heads vs {comps}; tie offers to time-to-deploy proof — {u}")
+
+    # Sales: doc talk-tracks + product counters
+    docs = by_theme.get("Docs / GTM", [])[:2]
+    for it in docs:
+        sales_actions.append(f"Add policy-driven isolation talk track vs {it['label']}; cite doc — {best_link([it])}")
+    for it in prod_moves[:2]:
+        sales_actions.append(f"Position full-stack isolation vs {it['label']} feature; include time-to-deploy proof — {best_link([it])}")
+
+    # Marketing: a single comparison + advisory landing, grounded in real links
+    if prod_moves:
+        it = prod_moves[0]
+        mkt_actions.append(f"Publish 300-word comparison: {it['label']} update vs Replica’s enterprise control + operational privacy — {best_link([it])}")
+    if by_theme.get("Regulatory"):
+        it = by_theme["Regulatory"][0]
+        mkt_actions.append(f"Refresh advisory landing with ‘why isolation now’; link source — {best_link([it])}")
+
+    # Product: gaps from docs + validate demand from launches
+    if docs:
+        it = docs[0]
+        prod_actions.append(f"Audit identity/threat/content policy gaps vs {it['label']} doc; propose quick wins — {best_link([it])}")
+    if prod_moves:
+        it = prod_moves[0]
+        prod_actions.append(f"Validate demand for {it['label']} feature in current RFPs; scope parity if repeated — {best_link([it])}")
+
+    # dedupe & cap
+    def dedupe_cap(seq, n=2):
+        seen=set(); out=[]
+        for s in seq:
+            if s not in seen:
+                out.append(s); seen.add(s)
+        return out[:n]
+    return (dedupe_cap(exec_actions), dedupe_cap(sales_actions),
+            dedupe_cap(mkt_actions), dedupe_cap(prod_actions))
+
+# ---- HTML
+def to_html(items, start, end):
     coverage = f"{start:%b %d}–{end:%b %d, %Y}" if start.year == end.year else f"{start:%b %d, %Y}–{end:%b %d, %Y}"
 
+    # Prepare per-row insights
+    whys = {}
+    for idx, it in enumerate(items):
+        phrases = key_phrases(it.get("_text",""))
+        whys[idx] = compose_why(it, phrases)
+
+    # TL;DR
+    tldr = build_tldr(items)
+
+    # Table rows (MM/DD, no Tag)
     rows=[]
     for idx,it in enumerate(items):
         date_mmdd = it["dt"].astimezone(timezone.utc).strftime("%m/%d")
         src = f'<a href="{it["url"]}" target="_blank" rel="noopener">Source</a>'
-        why = whys.get(idx) or "Potential to influence buyer criteria; integrate into talk tracks."
         rows.append(
             "<tr>"
             f"<td>{date_mmdd}</td>"
             f"<td>{html.escape(it['label'])}</td>"
             f"<td>{it['theme']}</td>"
             f"<td>{html.escape(it['title'])}</td>"
-            f"<td>{html.escape(why)}</td>"
+            f"<td>{html.escape(whys[idx])}</td>"
             f"<td>{src}</td>"
             "</tr>"
         )
 
-    def bullets(lst): 
-        return "".join(f"<li>{html.escape(x)}</li>" for x in lst) if lst else "<li>No material updates.</li>"
+    # Deltas
+    prev = load_prev_cache(CACHE_PATH).get("items", [])
+    deltas = build_deltas(items, prev)
+    try: save_cache(CACHE_PATH, items)
+    except Exception: pass
 
-    # Build role actions from items + phrases (still zero-LLM)
-    exec_actions, sales_actions, mkt_actions, prod_actions = derive_actions(items, texts_by_idx)
-
+    # Actions
+    exec_actions, sales_actions, mkt_actions, prod_actions = build_actions(items)
     def role_block(role, lst):
         if not lst: return ""
         return ("<tr>"
                 f"<td width='22%'><strong>{role}</strong></td>"
-                f"<td><ul style='margin:0 0 0 18px;'>{bullets(lst)}</ul></td>"
-                "</tr>")
-
+                f"<td><ul style='margin:0 0 0 18px;'>"
+                + "".join(f"<li>{html.escape(x)}</li>" for x in lst)
+                + "</ul></td></tr>")
     actions_rows = "".join([
         role_block("Exec", exec_actions),
         role_block("Sales", sales_actions),
@@ -361,6 +460,7 @@ def to_html(items, start, end, tldr, deltas, whys, texts_by_idx):
         role_block("Product", prod_actions),
     ]) or "<tr><td colspan='2'>No role-specific actions this week.</td></tr>"
 
+    # HTML skeleton
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -381,7 +481,7 @@ def to_html(items, start, end, tldr, deltas, whys, texts_by_idx):
   <div class="tl-dr">
     <strong>TL;DR</strong>
     <ul style="margin:8px 0 0 18px;padding:0;">
-      {bullets(tldr)}
+      {''.join(f"<li>{html.escape(x)}</li>" for x in tldr) if tldr else "<li>No material updates.</li>"}
     </ul>
   </div>
 </div>
@@ -390,7 +490,7 @@ def to_html(items, start, end, tldr, deltas, whys, texts_by_idx):
   <h3>Key Events (by Competitor)</h3>
   <table class="table" width="100%" cellpadding="8" cellspacing="0">
     <thead><tr>
-      <th align="left">Date</th>
+      <th align="left">Date (ET)</th>
       <th align="left">Competitor</th>
       <th align="left">Theme</th>
       <th align="left">What happened</th>
@@ -406,7 +506,7 @@ def to_html(items, start, end, tldr, deltas, whys, texts_by_idx):
 <div class="section">
   <h3>Deltas vs. Prior Week</h3>
   <ul style="margin:0 0 0 18px;color:#333;line-height:1.55;">
-    {bullets(deltas)}
+    {''.join(f"<li>{html.escape(x)}</li>" for x in deltas) if deltas else "<li>No major shifts vs last week.</li>"}
   </ul>
 </div>
 
@@ -419,88 +519,27 @@ def to_html(items, start, end, tldr, deltas, whys, texts_by_idx):
   </table>
 </div>
 
-<div class="section footer" style="color:#666;font-size:12px">
-  <div><strong>Note:</strong> Source links are validated (HTTP 200) at build time. Insights are locally generated from page text and keywords (no external AI).</div>
+<div class="section" style="color:#666;font-size:12px">
+  <div><strong>Note:</strong> Links are the publisher’s final URLs (no Google News). Duplicates are clustered by title + content similarity.</div>
 </div>
 
 </div></body></html>"""
 
-# ---------------- Derive actions from items (no LLM) ----------------
-
-def derive_actions(items, texts_by_idx):
-    exec_actions, sales_actions, mkt_actions, prod_actions = [], [], [], []
-    # score items for actionability
-    pri = {"Product":0,"Docs / GTM":1,"Regulatory":2,"FYI":3}
-    sorted_idx = sorted(range(len(items)), key=lambda i: (pri.get(items[i]["theme"],9), -int(items[i]["dt"].timestamp())))
-    top = sorted_idx[:6]
-
-    def short(url): return url
-
-    for i in top:
-        it = items[i]
-        text = texts_by_idx.get(i,"")
-        kws = key_phrases(text)
-        label, theme, u = it["label"], it["theme"], it["url"]
-
-        if theme == "Regulatory" and ("cisa" in u or "kev" in u or "gov" in domain(u)):
-            exec_actions.append(f"Prioritize opportunities under advisory; approve isolated workspace pilots tied to deadlines — {short(u)}")
-            mkt_actions.append(f"Update advisory landing with ‘why isolation now’; link source — {short(u)}")
-        elif theme == "Docs / GTM":
-            if any(k in kws for k in ["policy","isolation","zero trust","bundle","packaging"]):
-                sales_actions.append(f"Add policy-driven isolation talk track vs {label}; cite doc — {short(u)}")
-                prod_actions.append(f"Audit identity/threat/content policy gaps vs {label} doc; propose quick wins — {short(u)}")
-        elif theme == "Product":
-            if any(k in kws for k in ["pricing","tier","bundle","license"]):
-                exec_actions.append(f"Fund 1–2 lighthouse head-to-heads vs {label}; prepare pricing counters — {short(u)}")
-            else:
-                sales_actions.append(f"Position full-stack isolation vs {label} feature; include time-to-deploy proof — {short(u)}")
-                mkt_actions.append(f"Publish 300-word comparison: {label} update vs Replica’s ‘enterprise control + operational privacy’ — {short(u)}")
-
-    # dedupe / cap
-    def dedupe_cap(seq, n=2):
-        seen=set(); out=[]
-        for s in seq:
-            if s not in seen:
-                out.append(s); seen.add(s)
-        return out[:n]
-
-    return (dedupe_cap(exec_actions), dedupe_cap(sales_actions),
-            dedupe_cap(mkt_actions), dedupe_cap(prod_actions))
-
-# --------------------------------- main -------------------------------------
-
+# ---- main
 def main():
     cfg = load_conf(CONF_PATH)
-
     items = collect_items(cfg, strict=True, extra_days=0)
     if len(items) < MIN_ITEMS:
         items = collect_items(cfg, strict=False, extra_days=RELAX_DAYS)
 
-    # Extract article text and generate insights
-    texts_by_idx = {}
-    for idx, it in enumerate(items):
-        texts_by_idx[idx] = fetch_main_text(it["url"])
-
-    whys = {}
-    for idx, it in enumerate(items):
-        phrases = key_phrases(texts_by_idx.get(idx,""))
-        whys[idx] = insight_from_phrases(it, phrases)
-
-    # TL;DR and Deltas
-    tldr = build_tldr(items, texts_by_idx, max_bullets=4)
-    prev = load_prev_cache(CACHE_PATH).get("items", [])
-    deltas = build_deltas(items, prev)
-    try:
-        save_cache(CACHE_PATH, items)
-    except Exception:
-        pass
-
+    # if still empty, emit minimal doc
     today = datetime.now(timezone.utc).date()
     start = today - timedelta(days=int(cfg.get("window_days", 7)) - 1)
-    html_out = to_html(items, start, today, tldr, deltas, whys, texts_by_idx)
+
+    html_out = to_html(items, start, today)
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
         f.write(html_out)
-    print(f"[build_report_from_feeds] items={len(items)} (min={MIN_ITEMS}) zero-api insights=on")
+    print(f"[build_report_from_feeds] items={len(items)} (min={MIN_ITEMS}) dedup=on final_urls=on")
     return 0
 
 if __name__ == "__main__":
