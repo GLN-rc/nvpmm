@@ -18,8 +18,7 @@ jobs:
       EMAIL_TO:         ${{ secrets.EMAIL_TO }}
       EMAIL_PASSWORD:   ${{ secrets.EMAIL_PASSWORD }}
       PYTHONUNBUFFERED: "1"
-
-    steps:
+steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
