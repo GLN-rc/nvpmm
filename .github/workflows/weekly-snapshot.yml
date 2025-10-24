@@ -10,7 +10,6 @@ jobs:
     permissions:
       contents: read
     env:
-      # your exact secret names mapped to env
       OPENR_BASE: ${{ secrets.OPENR_BASE }}
       OPENR_API:  ${{ secrets.OPENR_API }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -30,8 +29,7 @@ jobs:
 
       - name: Run weekly snapshot (OpenRouter via LiteLLM)
         env:
-          # map provider -> what the script expects
-          LLM_API_BASE: ${{ env.OPENR_BASE }}   # e.g. https://openrouter.ai/api/v1
+          LLM_API_BASE: ${{ env.OPENR_BASE }}
           LLM_API_KEY:  ${{ env.OPENR_API }}
           MODEL: openrouter/auto
           MAX_TOKENS: "800"
@@ -49,23 +47,19 @@ jobs:
           name: weekly-snapshot
           path: report.html
 
-      - name: Email report via Gmail (inline SMTP)
-        env:
-          EMAIL_FROM: ${{ env.EMAIL_FROM }}        # full Gmail address
-          EMAIL_TO: ${{ env.EMAIL_TO }}            # comma-separated allowed
-          EMAIL_PASSWORD: ${{ env.EMAIL_PASSWORD }}# 16-char App Password
+      - name: Write mailer script
         run: |
-          python - <<'PY' import os, sys, smtplib, ssl from email.mime.text import MIMEText from email.mime.multipart import MIMEMultipart sender = os.environ.get("EMAIL_FROM") recips = [e.strip() for e in os.environ.get("EMAIL_TO","").split(",") if e.strip()] app_pw = os.environ.get("EMAIL_PASSWORD")
+          cat > send_email.py <<'PY'
+import os, sys, smtplib, ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
+sender = os.environ.get("EMAIL_FROM")
+recips = [e.strip() for e in os.environ.get("EMAIL_TO","").split(",") if e.strip()]
+app_pw = os.environ.get("EMAIL_PASSWORD")
 if not (sender and recips and app_pw):
-    print("Missing EMAIL_FROM/EMAIL_TO/EMAIL_PASSWORD"); sys.exit(1)
+    print("Missing EMAIL_FROM/EMAIL_TO/EMAIL_P_
 
-with open("report.html","r",encoding="utf-8") as f:
-    html = f.read() msg = MIMEMultipart("alternative") msg["Subject"] = "ReplicaRivals — Weekly Competitive Snapshot" msg["From"] = sender msg["To"] = ", ".join(recips) msg.attach(MIMEText(html, "html", "utf-8")) ctx = ssl.create_default_context()
-with smtplib.SMTP("smtp.gmail.com", 587, timeout=60) as server:
-    server.ehlo(); server.starttls(context=ctx); server.ehlo()
-    server.login(sender, app_pw)
-    server.sendmail(sender, recips, msg.as_string()) print("✅ Email sent to:", recips) PY
 
 #name: Weekly Snapshot
 # 
