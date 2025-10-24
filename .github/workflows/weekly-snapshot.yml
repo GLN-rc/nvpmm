@@ -43,10 +43,22 @@ jobs:
             python -m pip install openai PyGithub requests python-dotenv
           fi
 
-      - name: Run weekly snapshot
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Run weekly snapshot
+      env:
+        # === LLM via LiteLLM (default path) ===
+        LLM_API_KEY: ${{ secrets.OPENR_API }}
+        LLM_API_BASE: ${{ secrets.OPENR_BASE }}
+        MODEL: openrouter/auto           # pick a model your provider supports; 'auto' is fine to start
+        MAX_TOKENS: "800"
+        TEMP: "0.2"
+    
+#      - name: Run weekly snapshot
+#        env:
+#          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+        
         run: python weekly_snapshot.py
 
       - name: Upload report artifact (optional)
