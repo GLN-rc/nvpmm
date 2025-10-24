@@ -9,62 +9,29 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-    concurrency:
-      group: weekly-snapshot-${{ github.ref }}
-      cancel-in-progress: true
     env:
-      PYTHONUNBUFFERED: "1"
-      # your secrets mapped to env for reuse
+      # your exact secret names mapped to env
       OPENR_BASE: ${{ secrets.OPENR_BASE }}
       OPENR_API:  ${{ secrets.OPENR_API }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
       EMAIL_TO: ${{ secrets.EMAIL_TO }}
       EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      PYTHONUNBUFFERED: "1"
 
     steps:
-      - name: 🔹 Start — context & runner sanity
-        run: |
-          echo "Repo: $GITHUB_REPOSITORY"
-          echo "Ref:  $GITHUB_REF"
-          echo "SHA:  $GITHUB_SHA"
-          echo "Runner: $RUNNER_OS / $RUNNER_ARCH"
-          echo "Timestamp: $(date -u)"
-
-      - name: 🔹 Checkout repo
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: 🔹 Preflight — required secrets present
+      - name: Install dependencies
         run: |
-          ok=1
-          for v in OPENR_BASE OPENR_API EMAIL_FROM EMAIL_TO EMAIL_PASSWORD; do
-            if [ -z "${!v}" ]; then echo "❌ Missing $v"; ok=0; else echo "✅ $v set"; fi
-          done
-          if [ $ok -eq 0 ]; then echo "Secrets missing → abort"; exit 1; fi
-
-      - name: 🔹 Install dependencies
-        run: |
-          python -VV
           python -m pip install --upgrade pip
           python -m pip install "openai==0.28.1" litellm PyGithub requests python-dotenv
-          python -c "import sys; print('site:', sys.path[0])"
 
-      - name: 🔹 Locate weekly_snapshot2.py
-        id: locate
-        run: |
-          echo "Tree (top-level):"; ls -la
-          echo "Searching for weekly_snapshot2.py..."
-          SCRIPT=$(git ls-files | grep -E '(^|/)(weekly[_-]?snapshot2)\.py$' | head -n1 || true)
-          if [ -z "$SCRIPT" ]; then
-            echo "❌ Could not find weekly_snapshot2.py in repo"
-            exit 1
-          fi
-          echo "✅ Found: $SCRIPT"
-          echo "script=$SCRIPT" >> "$GITHUB_OUTPUT"
-
-      - name: 🔹 Run weekly snapshot (OpenRouter via LiteLLM)
+      - name: Run weekly snapshot (OpenRouter via LiteLLM)
         env:
-          LLM_API_BASE: ${{ env.OPENR_BASE }}
+          # map provider -> what the script expects
+          LLM_API_BASE: ${{ env.OPENR_BASE }}   # e.g. https://openrouter.ai/api/v1
           LLM_API_KEY:  ${{ env.OPENR_API }}
           MODEL: openrouter/auto
           MAX_TOKENS: "800"
@@ -73,22 +40,20 @@ jobs:
           USE_OPENAI: "false"
           OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
         run: |
-          set -e
-          echo "Running: ${{ steps.locate.outputs.script }}"
-          python "${{ steps.locate.outputs.script }}" > report.html
+          python weekly_snapshot2.py > report.html
           echo "Report size: $(wc -c < report.html) bytes"
 
-      - name: 🔹 Upload report artifact
+      - name: Upload report artifact
         uses: actions/upload-artifact@v4
         with:
           name: weekly-snapshot
           path: report.html
 
-      - name: 🔹 Email report via Gmail (inline SMTP)
+      - name: Email report via Gmail (inline SMTP)
         env:
-          EMAIL_FROM: ${{ env.EMAIL_FROM }}
-          EMAIL_TO: ${{ env.EMAIL_TO }}
-          EMAIL_PASSWORD: ${{ env.EMAIL_PASSWORD }}
+          EMAIL_FROM: ${{ env.EMAIL_FROM }}        # full Gmail address
+          EMAIL_TO: ${{ env.EMAIL_TO }}            # comma-separated allowed
+          EMAIL_PASSWORD: ${{ env.EMAIL_PASSWORD }}# 16-char App Password
         run: |
           python - <<'PY'
 import os, sys, smtplib, ssl
@@ -99,8 +64,6 @@ sender = os.environ.get("EMAIL_FROM")
 recips = [e.strip() for e in os.environ.get("EMAIL_TO","").split(",") if e.strip()]
 app_pw = os.environ.get("EMAIL_PASSWORD")
 
-print("From:", sender)
-print("To:", recips)
 if not (sender and recips and app_pw):
     print("Missing EMAIL_FROM/EMAIL_TO/EMAIL_PASSWORD"); sys.exit(1)
 
@@ -113,20 +76,13 @@ msg["From"] = sender
 msg["To"] = ", ".join(recips)
 msg.attach(MIMEText(html, "html", "utf-8"))
 
-context = ssl.create_default_context()
+ctx = ssl.create_default_context()
 with smtplib.SMTP("smtp.gmail.com", 587, timeout=60) as server:
-    server.ehlo()
-    server.starttls(context=context)
-    server.ehlo()
+    server.ehlo(); server.starttls(context=ctx); server.ehlo()
     server.login(sender, app_pw)
     server.sendmail(sender, recips, msg.as_string())
-
-print("✅ Email sent.")
+print("✅ Email sent to:", recips)
 PY
-
-
-
-
 
 #name: Weekly Snapshot
 # 
