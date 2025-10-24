@@ -49,7 +49,18 @@ jobs:
           path: report.html
 
       - name: Verify report isn't empty
-        run: test -s report.html || (echo
+        run: |
+          if [ ! -s report.html ]; then
+            echo "Empty report.html"
+            exit 1
+          fi
+
+      - name: Verify report has real content
+        run: |
+          if grep -q '\[Placeholder\]' report.html; then
+            echo "Report contains placeholders — generation failed"
+            exit 1
+          fi
 
 
 #name: Weekly Snapshot
