@@ -34,8 +34,8 @@ jobs:
           # Provider creds mapped to what the script expects
           LLM_API_BASE: ${{ env.OPENR_BASE }}   # e.g. https://openrouter.ai/api/v1
           LLM_API_KEY:  ${{ env.OPENR_API }}
-          MODEL: meta-llama/llama-3.1-70b-instruct
-          MAX_TOKENS: "800"
+          MODEL: mistralai/mixtral-8x7b-instruct
+          MAX_TOKENS: "1500"
           TEMP: "0.2"
           OUTPUT_HTML: report.html
           USE_OPENAI: "false"
