@@ -10,6 +10,7 @@ jobs:
     permissions:
       contents: read
 
+    # Map your secrets to env once for reuse
     env:
       OPENR_BASE:       ${{ secrets.OPENR_BASE }}
       OPENR_API:        ${{ secrets.OPENR_API }}
@@ -30,6 +31,7 @@ jobs:
 
       - name: Run weekly snapshot (OpenRouter via LiteLLM)
         env:
+          # Provider creds mapped to what the script expects
           LLM_API_BASE: ${{ env.OPENR_BASE }}   # e.g. https://openrouter.ai/api/v1
           LLM_API_KEY:  ${{ env.OPENR_API }}
           MODEL: deepseek/deepseek-chat
@@ -41,12 +43,6 @@ jobs:
         run: |
           python weekly_snapshot2.py > report.html
           echo "Report size: $(wc -c < report.html) bytes"
-
-      - name: Upload report artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: weekly-snapshot
-          path: report.html
 
       - name: Verify report isn't empty
         run: |
@@ -61,6 +57,21 @@ jobs:
             echo "Report contains placeholders — generation failed"
             exit 1
           fi
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-snapshot
+          path: report.html
+
+      - name: Email report via Gmail (App Password)
+        env:
+          EMAIL_FROM:     ${{ env.EMAIL_FROM }}       # full Gmail address
+          EMAIL_TO:       ${{ env.EMAIL_TO }}         # comma-separated ok
+          EMAIL_PASSWORD: ${{ env.EMAIL_PASSWORD }}   # 16-char app password
+        run: |
+          python send_email.py
+
 
 
 #name: Weekly Snapshot
