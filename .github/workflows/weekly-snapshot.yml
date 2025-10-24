@@ -49,14 +49,7 @@ jobs:
 
       - name: Write mailer script
         run: |
-          cat > send_email.py <<'PY'
-import os, sys, smtplib, ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-sender = os.environ.get("EMAIL_FROM")
-recips = [e.strip() for e in os.environ.get("EMAIL_TO","").split(",") if e.strip()]
-app_pw = os.environ.get("EMAIL_PASSWORD")
+          cat > send_email.py <<'PY' import os, sys, smtplib, ssl from email.mime.text import MIMEText from email.mime.multipart import MIMEMultipart sender = os.environ.get("EMAIL_FROM") recips = [e.strip() for e in os.environ.get("EMAIL_TO","").split(",") if e.strip()] app_pw = os.environ.get("EMAIL_PASSWORD")
 if not (sender and recips and app_pw):
     print("Missing EMAIL_FROM/EMAIL_TO/EMAIL_P_
 
