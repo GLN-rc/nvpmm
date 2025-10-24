@@ -65,8 +65,7 @@ with open("report.html","r",encoding="utf-8") as f:
 with smtplib.SMTP("smtp.gmail.com", 587, timeout=60) as server:
     server.ehlo(); server.starttls(context=ctx); server.ehlo()
     server.login(sender, app_pw)
-    server.sendmail(sender, recips, msg.as_string()) print("✅ Email sent to:", recips)
-PY
+    server.sendmail(sender, recips, msg.as_string()) print("✅ Email sent to:", recips) PY
 
 #name: Weekly Snapshot
 # 
