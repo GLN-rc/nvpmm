@@ -32,6 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install feedparser python-dateutil PyYAML requests tldextract
           python -m pip --version
+          python -m pip install \
+          feedparser python-dateutil PyYAML requests tldextract \
+          readability-lxml beautifulsoup4 lxml yake
+          python -c "import sys;print('py',sys.version)"
+          python -c "import feedparser,yaml,requests,readability,bs4,lxml,yake;print('deps OK')"
 
       - name: Ensure feeds config exists
         run: |
