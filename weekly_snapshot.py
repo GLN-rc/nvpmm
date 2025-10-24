@@ -30,13 +30,13 @@ Use the following HTML structure:
 
 # Call OpenAI with HTML format request
 response = openai.ChatCompletion.create(
-    model="gpt-5",
+    model="gpt-4o-mini",
     messages=[
         {"role": "system", "content": "You are ReplicaRivals, a competitive intelligence agent. Respond in clean HTML email format only."},
         {"role": "user", "content": prompt}
     ],
     temperature=0.3,
-    max_tokens=1800
+    max_tokens=800
 )
 
 html_content = response['choices'][0]['message']['content']
