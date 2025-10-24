@@ -20,14 +20,13 @@ jobs:
 
       - name: Run weekly snapshot (OpenRouter via LiteLLM)
         env:
-          # your secrets
+          # your secrets (provider)
           LLM_API_BASE: ${{ secrets.OPENR_BASE }}
           LLM_API_KEY:  ${{ secrets.OPENR_API }}
           MODEL: openrouter/auto
           MAX_TOKENS: "800"
           TEMP: "0.2"
           OUTPUT_HTML: report.html
-
           # keep OpenAI path available for later
           USE_OPENAI: "false"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -42,7 +41,7 @@ jobs:
 
       # ---- EMAIL: Gmail (uses App Password) ----
       - name: Email report via Gmail SMTP
-        if: contains(secrets.EMAIL_FROM, '@gmail.com')
+        if: ${{ contains(secrets.EMAIL_FROM, '@gmail.com') }}
         uses: dawidd6/action-send-mail@v3
         with:
           server: smtp.gmail.com
@@ -55,7 +54,7 @@ jobs:
           to: ${{ secrets.EMAIL_TO }}
           html_body: file://report.html
 
-      # ---- EMAIL: Office365 / Outlook ----
+      # ---- EMAIL: Office365 / other SMTP ----
       - name: Email report via Office365 SMTP
         if: ${{ !contains(secrets.EMAIL_FROM, '@gmail.com') }}
         uses: dawidd6/action-send-mail@v3
