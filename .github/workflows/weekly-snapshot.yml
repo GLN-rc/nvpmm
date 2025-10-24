@@ -1,12 +1,7 @@
 name: Weekly Snapshot
- 
+
 on:
   workflow_dispatch:
-#  schedule:
-#    # Fridays during Daylight Time (EDT = UTC-4): 13:00 UTC == 09:00 ET
-#    - cron: "0 9 * * FRI"
-#    # Fridays during Standard Time (EST = UTC-5): 14:00 UTC == 09:00 ET
-#    - cron: "0 14 * * FRI"
 
 jobs:
   run:
@@ -18,7 +13,58 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # Gate: only continue if it's Friday 09:00 in America/New_York
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "openai==0.28.1" litellm PyGithub requests python-dotenv
+
+      - name: Run weekly snapshot
+        env:
+          # LiteLLM provider (e.g., OpenRouter)
+          OPENR_BASE: ${{ secrets.OPENR_BASE }}   # e.g. https://openrouter.ai/api/v1
+          OPENR_API:  ${{ secrets.OPENR_API }}
+          MODEL: openrouter/auto
+          MAX_TOKENS: "800"
+          TEMP: "0.2"
+          OUTPUT_HTML: report.html
+
+          # OpenAI (optional for later switch-back)
+          USE_OPENAI: "false"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_ORG: ${{ secrets.OPENAI_ORG }}
+        run: |
+          python weekly_snapshot.py > report.html
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-snapshot
+          path: report.html
+
+
+
+
+#name: Weekly Snapshot
+# 
+#on:
+#  workflow_dispatch:
+#  schedule:
+#    # Fridays during Daylight Time (EDT = UTC-4): 13:00 UTC == 09:00 ET
+#    - cron: "0 9 * * FRI"
+#    # Fridays during Standard Time (EST = UTC-5): 14:00 UTC == 09:00 ET
+#    - cron: "0 14 * * FRI"
+#
+#jobs:
+#  run:
+#    runs-on: ubuntu-latest
+#    permissions:
+#      contents: read
+#
+#    steps:
+#      - name: Checkout repo
+#        uses: actions/checkout@v4
+#
+#      # Gate: only continue if it's Friday 09:00 in America/New_York
 #      - name: Ensure it's 09:00 Friday in New York
 #        run: |
 #          ny_wday=$(TZ=America/New_York date +%u) # 5 = Friday
@@ -28,41 +74,41 @@ jobs:
 #            echo "Not 09:00 Friday in New York—exiting."
 #            exit 0
 #          fi
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install "openai==0.28.1" litellm PyGithub requests python-dotenv
-
-    - name: Run weekly snapshot
-      env:
-        # === LLM via LiteLLM (default path) ===
-        OPENR_API: ${{ secrets.OPENR_API }}
-        OPENR_BASE: ${{ secrets.OPENR_BASE }}
-        MODEL: openrouter/auto           # pick a model your provider supports; 'auto' is fine to start
-        MAX_TOKENS: "800"
-        TEMP: "0.2"
-        OUTPUT_HTML: report.html
-        SNAPSHOT_WINDOW_DAYS: "7"   
+#
+#      - name: Set up Python
+#        uses: actions/setup-python@v5
+#        with:
+#          python-version: "3.12"
+#
+#      - name: Install dependencies
+#        run: |
+#          python -m pip install --upgrade pip
+#          python -m pip install "openai==0.28.1" litellm PyGithub requests python-dotenv
+#
+#    - name: Run weekly snapshot
+#      env:
+#        # === LLM via LiteLLM (default path) ===
+#        OPENR_API: ${{ secrets.OPENR_API }}
+#        OPENR_BASE: ${{ secrets.OPENR_BASE }}
+#        MODEL: openrouter/auto           # pick a model your provider supports; 'auto' is fine to start
+#        MAX_TOKENS: "800"
+#        TEMP: "0.2"
+#        OUTPUT_HTML: report.html
+#        SNAPSHOT_WINDOW_DAYS: "7"   
 #      - name: Run weekly snapshot
 #        env:
 #          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-        
-        run: python weekly_snapshot2.py > report.htmk
-
-      - name: Upload report artifact (optional)
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: weekly-snapshot2
-          path: |
-            report.html
-            output/**
-          if-no-files-found: ignore
+#
+#        
+#        run: python weekly_snapshot2.py > report.htmk
+#
+#      - name: Upload report artifact (optional)
+#        if: success()
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: weekly-snapshot2
+#          path: |
+#            report.html
+#            output/**
+#          if-no-files-found: ignore
