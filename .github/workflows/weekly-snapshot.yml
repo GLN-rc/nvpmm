@@ -19,15 +19,15 @@ jobs:
         uses: actions/checkout@v4
 
       # Gate: only continue if it's Friday 09:00 in America/New_York
-      - name: Ensure it's 09:00 Friday in New York
-        run: |
-          ny_wday=$(TZ=America/New_York date +%u) # 5 = Friday
-          ny_hour=$(TZ=America/New_York date +%H) # 09 = 9am
-          echo "NY weekday=$ny_wday hour=$ny_hour"
-          if [ "$ny_wday" != "5" ] || [ "$ny_hour" != "09" ]; then
-            echo "Not 09:00 Friday in New York—exiting."
-            exit 0
-          fi
+#      - name: Ensure it's 09:00 Friday in New York
+#        run: |
+#          ny_wday=$(TZ=America/New_York date +%u) # 5 = Friday
+#          ny_hour=$(TZ=America/New_York date +%H) # 09 = 9am
+#          echo "NY weekday=$ny_wday hour=$ny_hour"
+#          if [ "$ny_wday" != "5" ] || [ "$ny_hour" != "09" ]; then
+#            echo "Not 09:00 Friday in New York—exiting."
+#            exit 0
+#          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,30 +37,25 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            python -m pip install -r requirements.txt
-          else
-            python -m pip install openai PyGithub requests python-dotenv
-          fi
-
+          python -m pip install "openai==0.28.1" litellm PyGithub requests python-dotenv
 
     - name: Run weekly snapshot
       env:
         # === LLM via LiteLLM (default path) ===
-        OPENR_API: https://openrouter.ai/api/v1 # ${{ secrets.OPENR_API }}
+        OPENR_API: ${{ secrets.OPENR_API }}
         OPENR_BASE: ${{ secrets.OPENR_BASE }}
         MODEL: openrouter/auto           # pick a model your provider supports; 'auto' is fine to start
         MAX_TOKENS: "800"
         TEMP: "0.2"
- OUTPUT_HTML: report.html
-  SNAPSHOT_WINDOW_DAYS: "7"   
+        OUTPUT_HTML: report.html
+        SNAPSHOT_WINDOW_DAYS: "7"   
 #      - name: Run weekly snapshot
 #        env:
 #          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
         
-        run: python weekly_snapshot2.py
+        run: python weekly_snapshot2.py > report.htmk
 
       - name: Upload report artifact (optional)
         if: success()
