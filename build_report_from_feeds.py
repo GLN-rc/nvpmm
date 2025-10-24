@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
-# Build weekly report from RSS/Atom feeds with strict link validation,
-# insight-style "Why it matters", no Tag column, MM/DD dates, and
-# news-tied Recommended Actions.
+# Build weekly report from RSS/Atom feeds with:
+# - strict pass + automatic relaxed fallback if too few items
+# - insight-style "Why it matters"
+# - MM/DD dates, no Tag column
+# - news-tied Recommended Actions
+# - verbose diagnostics to understand filtering
 
-import os, sys, re, html
+import os, sys, re, html, collections
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 import requests, feedparser, yaml
 from dateutil import parser as dtp
 
-OUTPUT_HTML = os.environ.get("OUTPUT_HTML", "report.html")
-CONF_PATH   = os.environ.get("NEWS_FEEDS_CONFIG", "config/news_feeds.yaml")
+OUTPUT_HTML       = os.environ.get("OUTPUT_HTML", "report.html")
+CONF_PATH         = os.environ.get("NEWS_FEEDS_CONFIG", "config/news_feeds.yaml")
+MIN_ITEMS         = int(os.environ.get("MIN_ITEMS", "4"))      # trigger relaxed pass if fewer than this
+RELAX_DAYS        = int(os.environ.get("RELAX_DAYS", "3"))     # extend window by N days in relaxed pass
+DEBUG_BUILDER     = os.environ.get("DEBUG_BUILDER", "0") == "1"
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/127 Safari/537.36"
 S = requests.Session()
-S.headers.update({
-    "User-Agent": UA,
-    "Referer": "https://github.com/replicarivals/workflow"
-})
+S.headers.update({"User-Agent": UA, "Referer": "https://github.com/replicarivals/workflow"})
 TIMEOUT = 20
 
 # ---------------------------- YAML / HTTP helpers ----------------------------
@@ -80,18 +83,6 @@ def path(u: str) -> str:
     except Exception:
         return "/"
 
-def allowed_by_domain_and_path(u: str, allowed_domains: set, allowed_prefixes: dict, excludes: list) -> bool:
-    d = domain(u)
-    p = path(u)
-    if any(x in u for x in excludes):
-        return False
-    if allowed_domains and d not in allowed_domains:
-        return False
-    prefs = allowed_prefixes.get(d, [])
-    if prefs:
-        return any(p.startswith(pref) for pref in prefs)
-    return True
-
 # ----------------------------- Categorization -------------------------------
 
 def pick_theme(title, summary, hints):
@@ -107,8 +98,6 @@ def derive_insight(item):
     theme = item["theme"]
     label = item["label"]
     why_seed = (item.get("raw_summary") or "").lower()
-
-    # Heuristics by theme / keywords
     t_low = f"{title} {why_seed}".lower()
 
     if theme == "Regulatory":
@@ -119,32 +108,59 @@ def derive_insight(item):
     if theme == "Docs / GTM":
         if "isolation" in t_low or "policy" in t_low or "zero trust" in t_low:
             return "Signals continued investment and likely bundling/price pressure in larger Zero Trust deals."
-        return "Documentation shift often precedes packaging and sales motions—watch for RFP language changes."
+        return "Documentation shifts often precede packaging/sales motions—watch RFP language changes."
 
     if theme == "Product":
-        if "launch" in t_low or "release" in t_low or "ga" in t_low:
-            return f"Expands {label} capability footprint; stress Replica’s full-stack isolation vs point features in competitive cycles."
-        if "pricing" in t_low or "tier" in t_low:
-            return f"Alters deal economics; prepare pricing counters and value proof tied to time-to-deploy."
-        return "Feature momentum may change shortlist dynamics in enterprise evaluations."
+        if any(k in t_low for k in ["launch", "release", "ga"]):
+            return f"Expands {label} footprint; stress Replica’s full-stack isolation vs point features in active cycles."
+        if any(k in t_low for k in ["pricing", "tier", "license"]):
+            return f"Alters deal economics; prep counters and time-to-deploy proof."
+        return "Feature momentum can change shortlist dynamics; validate in current evaluations."
 
-    # Generic insight fallback
-    if "research" in t_low or "osint" in t_low:
-        return "Sustains top-of-funnel interest among OSINT/investigation teams; reference in discovery."
-    return "Potential to influence buyer criteria; incorporate into talk tracks where relevant."
+    if any(k in t_low for k in ["research","osint","investigator"]):
+        return "Sustains top-of-funnel with OSINT/investigation teams; reference in discovery."
+    return "Likely to influence buyer criteria; incorporate into talk tracks where relevant."
 
-# ----------------------------- Feed collection ------------------------------
+# -------------------------- Filtering & collection --------------------------
 
-def collect_items(cfg):
-    days = int(cfg.get("window_days", 7))
+def allowed_by_rules(u: str, allowed_domains: set, allowed_prefixes: dict, excludes: list, strict: bool) -> bool:
+    """Domain/path/exclude rules. If strict=False, only apply excludes."""
+    if any(x in u for x in excludes):
+        return False
+    if not strict:
+        return True
+    d = domain(u)
+    p = path(u)
+    if allowed_domains and d not in allowed_domains:
+        return False
+    prefs = allowed_prefixes.get(d, [])
+    if prefs:
+        return any(p.startswith(pref) for pref in prefs)
+    return True
+
+def soft_keyword_match(blob: str, kws: list[str]) -> bool:
+    """Softer match used in relaxed pass: any competitor keyword OR brand name tokens."""
+    if not kws:
+        return True
+    b = blob.lower()
+    for k in kws:
+        if k.lower() in b:
+            return True
+    # Split on spaces for crude brand tokens
+    tokens = [t for k in kws for t in re.split(r"\W+", k.lower()) if t]
+    return any(t in b for t in tokens)
+
+def collect_items(cfg, strict=True, extra_days=0):
+    days = int(cfg.get("window_days", 7)) + (extra_days if not strict else 0)
     allowed_domains = set([d.lower() for d in cfg.get("allowed_domains", [])])
     allowed_prefixes_raw = cfg.get("allowed_path_prefixes", {}) or {}
     allowed_prefixes = {k.lower(): v for k, v in allowed_prefixes_raw.items()}
     excludes = [e.lower() for e in cfg.get("exclude_patterns", [])]
     theme_hints = cfg.get("theme_hints", {})
 
-    candidates = []
-    seen_urls = set()
+    candidates, seen_urls = [], set()
+    reasons = collections.Counter()
+    per_feed_counts = collections.Counter()
 
     def sources():
         for c in cfg.get("competitors", []):
@@ -157,48 +173,72 @@ def collect_items(cfg):
             try:
                 fp = feedparser.parse(feed_url)
             except Exception:
+                reasons["feed_parse_error"] += 1
                 continue
+            found_this_feed = 0
             for e in fp.entries:
                 url = norm_url(e.get("link",""))
-                if not url or url in seen_urls:
+                if not url:
+                    reasons["no_url"] += 1
                     continue
-                if not allowed_by_domain_and_path(url, allowed_domains, allowed_prefixes, excludes):
+                if url in seen_urls:
+                    reasons["duplicate_url"] += 1
+                    continue
+                if not allowed_by_rules(url, allowed_domains, allowed_prefixes, excludes, strict):
+                    reasons["domain_or_path_filtered"] += 1
                     continue
 
                 dt = parse_date(e)
                 if not within_window(dt, days):
+                    reasons["outside_window"] += 1
                     continue
 
                 title = (e.get("title") or "").strip()
                 summary = e.get("summary") or e.get("description") or ""
-                blob = f"{title} {summary}".lower()
+                blob = f"{title} {summary}"
 
-                if kws and not any(k.lower() in blob for k in kws):
-                    continue
+                if strict:
+                    if kws and not any(k.lower() in blob.lower() for k in kws):
+                        reasons["keyword_filtered_strict"] += 1
+                        continue
+                else:
+                    if not soft_keyword_match(blob, kws):
+                        reasons["keyword_filtered_relaxed"] += 1
+                        continue
 
                 if not http_ok(url):
+                    reasons["http_non_200"] += 1
                     continue
 
                 seen_urls.add(url)
                 theme = pick_theme(title, summary, theme_hints)
                 candidates.append({
-                    "dt": dt,  # keep datetime for MM/DD formatting later
+                    "dt": dt,
                     "date": dt.astimezone(timezone.utc).date().isoformat(),
                     "label": label,
                     "stype": stype,
                     "theme": theme,
                     "title": title,
                     "raw_summary": summary,
-                    "why": first_sentence(summary),  # seed; will be replaced by insight
+                    "why": first_sentence(summary),  # seed; will convert to insight later
                     "url": url,
                 })
+                found_this_feed += 1
+            per_feed_counts[feed_url] += found_this_feed
 
+    # Sort recent first
     candidates.sort(key=lambda x: (x["dt"], x["label"]), reverse=True)
-    # Transform 'why' into insight (distinct from title/summary)
+    # Convert 'why' into insight
     for it in candidates:
         it["why"] = derive_insight(it)
 
-    return candidates[:20]
+    if DEBUG_BUILDER:
+        mode = "STRICT" if strict else f"RELAXED(+{extra_days}d)"
+        print(f"[builder] {mode}: items={len(candidates)}", file=sys.stderr)
+        print("[builder] per-feed kept:", dict(per_feed_counts), file=sys.stderr)
+        print("[builder] drop reasons (top):", reasons.most_common(8), file=sys.stderr)
+
+    return candidates
 
 # ----------------------------- Actions builder ------------------------------
 
@@ -206,15 +246,11 @@ def build_actions(items):
     """Produce specific, news-tied actions per function."""
     exec_actions, sales_actions, mkt_actions, prod_actions = [], [], [], []
 
-    # pick a few anchors by theme/competitor
     prod_updates   = [i for i in items if i["theme"] == "Product" and i["stype"]=="competitor"]
     docs_updates   = [i for i in items if i["theme"] == "Docs / GTM"]
     regulatory     = [i for i in items if i["theme"] == "Regulatory"]
-    by_competitor  = {}
-    for i in items:
-        by_competitor.setdefault(i["label"], []).append(i)
 
-    # Exec: prioritize lighthouse + budget/approval tied to signals
+    # Exec
     if regulatory:
         exec_actions.append("Prioritize accounts under new advisories; authorize fast-track isolated workspace pilots to meet deadlines.")
     if prod_updates:
@@ -223,7 +259,7 @@ def build_actions(items):
     if not exec_actions:
         exec_actions.append("Review top 3 opportunities influenced by this week’s updates; remove internal blockers to pilot starts.")
 
-    # Sales: talk tracks & proof points from real links
+    # Sales
     for i in docs_updates[:2]:
         sales_actions.append(f"Add a ‘policy-driven isolation’ talk track vs {i['label']} using this doc: {i['url']}")
     for i in prod_updates[:2]:
@@ -231,7 +267,7 @@ def build_actions(items):
     if not sales_actions:
         sales_actions.append("Use verified links from this brief in follow-ups; contrast our pillars vs competitor claims.")
 
-    # Marketing: comparison notes / landing tweaks
+    # Marketing
     if prod_updates:
         c = prod_updates[0]["label"]
         mkt_actions.append(f"Publish a 300-word comparison: {c} update vs Replica’s ‘enterprise control + operational privacy’.")
@@ -240,11 +276,11 @@ def build_actions(items):
     if not mkt_actions:
         mkt_actions.append("Ship one short ‘What changed this week’ blog referencing links in this brief.")
 
-    # Product: parity gaps & roadmap nudges
+    # Product
     for i in docs_updates[:1]:
         prod_actions.append(f"Audit gaps in identity/threat/content policies vs {i['label']} doc; propose quick wins.")
     for i in prod_updates[:1]:
-        prod_actions.append(f"Validate customer demand for {i['label']}’s new feature in active RFPs; scope parity if repeatedly requested.")
+        prod_actions.append(f"Validate demand for {i['label']}’s new feature in active RFPs; scope parity if repeatedly requested.")
     if not prod_actions:
         prod_actions.append("Review top-asked capabilities in enterprise RFPs this week; queue small parity fixes if high-impact.")
 
@@ -253,7 +289,6 @@ def build_actions(items):
 # ----------------------------- HTML rendering -------------------------------
 
 def to_html(items, start, end):
-    # Coverage window stays with month names; table dates become MM/DD
     coverage = f"{start:%b %d}–{end:%b %d, %Y}" if start.year == end.year else f"{start:%b %d, %Y}–{end:%b %d, %Y}"
 
     tldr = [
@@ -261,7 +296,6 @@ def to_html(items, start, end):
         for it in items[:3]
     ] or ["<li>No material updates.</li>"]
 
-    # Build table without Tag column; Date in MM/DD
     rows = []
     for it in items:
         date_mmdd = it["dt"].astimezone(timezone.utc).strftime("%m/%d")
@@ -277,7 +311,6 @@ def to_html(items, start, end):
             "</tr>"
         )
 
-    # News-tied actions
     exec_actions, sales_actions, mkt_actions, prod_actions = build_actions(items)
 
     html_doc = f"""<!doctype html>
@@ -364,7 +397,7 @@ def to_html(items, start, end):
 </div>
 
 <div class="section footer" style="color:#666;font-size:12px">
-  <div><strong>Note:</strong> Links are validated (HTTP 200) with a browser UA at build time.</div>
+  <div><strong>Note:</strong> Links are validated (HTTP 200) with a browser UA at build time. Strict filters relax automatically if too few items are found.</div>
 </div>
 
 </div></body></html>"""
@@ -374,13 +407,22 @@ def to_html(items, start, end):
 
 def main():
     cfg = load_conf(CONF_PATH)
-    items = collect_items(cfg)
+
+    # Pass 1: strict
+    items = collect_items(cfg, strict=True, extra_days=0)
+
+    # If too few, Pass 2: relaxed (wider net)
+    if len(items) < MIN_ITEMS:
+        if DEBUG_BUILDER:
+            print(f"[builder] Strict pass yielded {len(items)} (< {MIN_ITEMS}); running relaxed pass…", file=sys.stderr)
+        items = collect_items(cfg, strict=False, extra_days=RELAX_DAYS)
+
     today = datetime.now(timezone.utc).date()
     start = today - timedelta(days=int(cfg.get("window_days", 7)) - 1)
     html_out = to_html(items, start, today)
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
         f.write(html_out)
-    print(f"[build_report_from_feeds] kept {len(items)} items after strict validation")
+    print(f"[build_report_from_feeds] kept {len(items)} items (min={MIN_ITEMS})")
     return 0
 
 if __name__ == "__main__":
