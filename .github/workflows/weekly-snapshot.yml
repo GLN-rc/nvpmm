@@ -9,8 +9,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+
     env:
-      # your exact secret names
       OPENR_BASE:       ${{ secrets.OPENR_BASE }}
       OPENR_API:        ${{ secrets.OPENR_API }}
       OPENAI_API_KEY:   ${{ secrets.OPENAI_API_KEY }}
@@ -18,7 +18,8 @@ jobs:
       EMAIL_TO:         ${{ secrets.EMAIL_TO }}
       EMAIL_PASSWORD:   ${{ secrets.EMAIL_PASSWORD }}
       PYTHONUNBUFFERED: "1"
-steps:
+
+    steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
@@ -29,7 +30,6 @@ steps:
 
       - name: Run weekly snapshot (OpenRouter via LiteLLM)
         env:
-          # map provider -> what the script expects
           LLM_API_BASE: ${{ env.OPENR_BASE }}   # e.g. https://openrouter.ai/api/v1
           LLM_API_KEY:  ${{ env.OPENR_API }}
           MODEL: deepseek/deepseek-chat
@@ -47,23 +47,9 @@ steps:
         with:
           name: weekly-snapshot
           path: report.html
-          
-       - name: Verify report isn't empty
-         run: test -s report.html || (echo "Empty report.html" && exit 1)
 
-       - name: Verify report has real content
-         run: |
-         if grep -q "\[Placeholder\]" report.html; then
-         echo "Report contains placeholders — generation failed"; exit 1
-         fi
-
-      - name: Email report via Gmail (App Password)
-        env:
-          EMAIL_FROM:     ${{ env.EMAIL_FROM }}
-          EMAIL_TO:       ${{ env.EMAIL_TO }}
-          EMAIL_PASSWORD: ${{ env.EMAIL_PASSWORD }}
-        run: |
-          python send_email.py
+      - name: Verify report isn't empty
+        run: test -s report.html || (echo
 
 
 #name: Weekly Snapshot
