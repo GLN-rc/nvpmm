@@ -33,12 +33,12 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_ORG: ${{ secrets.OPENAI_ORG }}
         run: |
-          python weekly_snapshot.py > report.html
+          python weekly_snapshot2.py > report.html
 
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
         with:
-          name: weekly-snapshot
+          name: weekly-snapshot2
           path: report.html
 
 
