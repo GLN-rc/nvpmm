@@ -50,7 +50,7 @@ competitors:
       - "https://blog.cloudflare.com/rss/"
 
   - name: Authentic8
-    keywords: ["Authentic8", "Silo", "managed attribution", "OSINT"]
+    keywords: ["Authentic8", "managed attribution", "OSINT"]
     feeds:
       - "https://www.authentic8.com/blog/rss.xml"
       - "https://news.google.com/rss/search?q=Authentic8%20OR%20%22Silo%22&hl=en-US&gl=US&ceid=US:en"
