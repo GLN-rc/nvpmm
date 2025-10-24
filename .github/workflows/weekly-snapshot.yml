@@ -2,11 +2,11 @@ name: Weekly Snapshot
  
 on:
   workflow_dispatch:
-  schedule:
-    # Fridays during Daylight Time (EDT = UTC-4): 13:00 UTC == 09:00 ET
-    - cron: "0 9 * * FRI"
-    # Fridays during Standard Time (EST = UTC-5): 14:00 UTC == 09:00 ET
-    - cron: "0 14 * * FRI"
+#  schedule:
+#    # Fridays during Daylight Time (EDT = UTC-4): 13:00 UTC == 09:00 ET
+#    - cron: "0 9 * * FRI"
+#    # Fridays during Standard Time (EST = UTC-5): 14:00 UTC == 09:00 ET
+#    - cron: "0 14 * * FRI"
 
 jobs:
   run:
