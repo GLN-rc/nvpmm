@@ -36,7 +36,7 @@ jobs:
           LLM_API_KEY:  ${{ env.OPENR_API }}
           MODEL: mistralai/mixtral-8x7b-instruct
           MAX_TOKENS: "1500"
-          TEMP: "0.2"
+          TEMP: "0.18"
           OUTPUT_HTML: report.html
           SNAPSHOT_CONFIG: config/company.yaml
           EXTRA_NOTES: notes/weekly_signals.md
