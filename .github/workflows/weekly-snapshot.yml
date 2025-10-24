@@ -55,8 +55,7 @@ jobs:
           EMAIL_TO: ${{ env.EMAIL_TO }}            # comma-separated allowed
           EMAIL_PASSWORD: ${{ env.EMAIL_PASSWORD }}# 16-char App Password
         run: |
-          python - <<'PY'
-import os, sys, smtplib, ssl
+          python - <<'PY' import os, sys, smtplib, ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
