@@ -48,14 +48,14 @@ jobs:
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
         run: |
           python - << 'PY'
-import os, json, requests
-from_email = os.environ["FROM_EMAIL"]
-to_emails = [e.strip() for e in os.environ["TO_EMAILS"].split(",") if e.strip()]
-html = open("report.html","r",encoding="utf-8").read()
-data = {
-    "from": from_email,
-    "to": to_emails,
-    "subject": "ReplicaRivals — Weekly Competitive Snapshot",
+          import os, json, requests
+          from_email = os.environ["FROM_EMAIL"]
+          to_emails = [e.strip() for e in os.environ["TO_EMAILS"].split(",") if e.strip()]
+          html = open("report.html","r",encoding="utf-8").read()
+          data = {
+          "from": from_email,
+         "to": to_emails,
+         "subject": "ReplicaRivals — Weekly Competitive Snapshot",
     "html": html
 }
 r = requests.post(
