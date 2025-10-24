@@ -18,12 +18,13 @@ product_pillars:
 # >>> These two lists drive coverage. Keep them tight. <<<
 competitors:
   - Menlo Security
-  - Authentic8 (Silo)
-  - Cloudflare (Zero Trust / Browser Isolation)
+  - Authentic8
+  - Silo
+  - Cloudflare
   - Kasm Technologies
-  - Island (Enterprise Browser)
-  - Hypori (BYOD isolation)
-  - NetAbstraction (Managed Attribution)
+  - Island
+  - Hypori
+  - NetAbstraction
 
 ignore_competitors:
   - SASE vendors without isolation/MAAT
