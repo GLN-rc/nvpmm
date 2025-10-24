@@ -6,10 +6,57 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      # your exact secret names
+      OPENR_BASE:       ${{ secrets.OPENR_BASE }}
+      OPENR_API:        ${{ secrets.OPENR_API }}
+      OPENAI_API_KEY:   ${{ secrets.OPENAI_API_KEY }}
+      EMAIL_FROM:       ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO:         ${{ secrets.EMAIL_TO }}
+      EMAIL_PASSWORD:   ${{ secrets.EMAIL_PASSWORD }}
+      PYTHONUNBUFFERED: "1"
+
     steps:
-      - name: Hello
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
         run: |
-          echo "It works: $(date -u)"
+          python -m pip install --upgrade pip
+          python -m pip install "openai==0.28.1" litellm PyGithub requests python-dotenv
+
+      - name: Run weekly snapshot (OpenRouter via LiteLLM)
+        env:
+          # map provider -> what the script expects
+          LLM_API_BASE: ${{ env.OPENR_BASE }}   # e.g. https://openrouter.ai/api/v1
+          LLM_API_KEY:  ${{ env.OPENR_API }}
+          MODEL: openrouter/auto
+          MAX_TOKENS: "800"
+          TEMP: "0.2"
+          OUTPUT_HTML: report.html
+          USE_OPENAI: "false"
+          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
+        run: |
+          python weekly_snapshot2.py > report.html
+          echo "Report size: $(wc -c < report.html) bytes"
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-snapshot
+          path: report.html
+
+      - name: Email report via Gmail (App Password)
+        env:
+          EMAIL_FROM:     ${{ env.EMAIL_FROM }}
+          EMAIL_TO:       ${{ env.EMAIL_TO }}
+          EMAIL_PASSWORD: ${{ env.EMAIL_PASSWORD }}
+        run: |
+          python send_email.py
+
 
 #name: Weekly Snapshot
 # 
