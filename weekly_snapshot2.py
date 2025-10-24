@@ -1,51 +1,35 @@
 #!/usr/bin/env python3
 """
-weekly_snapshot2.py — LIVE generator with company config (no canned fallback)
+weekly_snapshot2.py — LIVE generator w/ strict style guide (no canned fallback)
 
-- Loads org context from YAML (competitors, ICPs, pillars, allowed/ignored topics)
-- Calls an OpenAI-compatible endpoint (e.g., OpenRouter) via LiteLLM
-- Adds a small LIVE badge with model + timestamp
-- Exits 1 on empty/invalid output (so CI catches issues)
-
-Env (required):
-  LLM_API_BASE (e.g., https://openrouter.ai/api/v1)
-  LLM_API_KEY
-
-Env (optional):
-  MODEL            (default: mistralai/mixtral-8x7b-instruct)
-  MAX_TOKENS       (default: 1500)
-  TEMP             (default: 0.25)
-  OUTPUT_HTML      (default: report.html)
-  SNAPSHOT_CONFIG  (default: config/company.yaml)
-  EXTRA_NOTES      (default: notes/weekly_signals.md)
-
-Files (optional but recommended):
-  config/company.yaml
-  notes/weekly_signals.md
+- Reads org context from YAML + optional notes
+- Uses LiteLLM against an OpenAI-compatible endpoint (e.g., OpenRouter)
+- Enforces scannable format via style/rubric instructions (no placeholders)
+- Produces UTF-8 HTML with a small LIVE footer badge
 """
 
-import os, sys, re, textwrap, json
+import os, sys, re, json, textwrap
 from datetime import date, datetime, timedelta, timezone
 
-# ---------- Env ----------
-MODEL = os.getenv("MODEL", "mistralai/mixtral-8x7b-instruct")
-LLM_API_BASE = os.getenv("LLM_API_BASE")
-LLM_API_KEY  = os.getenv("LLM_API_KEY")
-MAX_TOKENS   = int(os.getenv("MAX_TOKENS", "1500"))
-TEMP         = float(os.getenv("TEMP", "0.25"))
-OUTPUT_HTML  = os.getenv("OUTPUT_HTML", "report.html")
-CONF_PATH    = os.getenv("SNAPSHOT_CONFIG", "config/company.yaml")
-NOTES_PATH   = os.getenv("EXTRA_NOTES", "notes/weekly_signals.md")
+# -------- Runtime config (env) --------
+MODEL         = os.getenv("MODEL", "mistralai/mixtral-8x7b-instruct")
+LLM_API_BASE  = os.getenv("LLM_API_BASE")
+LLM_API_KEY   = os.getenv("LLM_API_KEY")
+MAX_TOKENS    = int(os.getenv("MAX_TOKENS", "1500"))
+TEMP          = float(os.getenv("TEMP", "0.25"))
+OUTPUT_HTML   = os.getenv("OUTPUT_HTML", "report.html")
+CONF_PATH     = os.getenv("SNAPSHOT_CONFIG", "config/company.yaml")
+NOTES_PATH    = os.getenv("EXTRA_NOTES", "notes/weekly_signals.md")
 
-# ---------- Date window ----------
+# -------- Date window --------
 end = date.today()
 start = end - timedelta(days=6)
-window_str = f"{start:%b %d}–{end:%b %d, %Y}" if start.year == end.year else f"{start:%b %d, %Y}–{end:%b %d, %Y}"
+WINDOW_STR = f"{start:%b %d}–{end:%b %d, %Y}" if start.year == end.year else f"{start:%b %d, %Y}–{end:%b %d, %Y}"
 
-# ---------- Utils ----------
-def _badge(model: str) -> str:
+# -------- Helpers --------
+def _badge() -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
-    return f'<div style="color:#0a0;font-size:12px;margin:10px 20px">Mode: <b>LIVE</b> • Model: {model} • Generated: {stamp}</div>'
+    return f'<div style="color:#0a0;font-size:12px;margin:10px 20px">Mode: <b>LIVE</b> • Model: {MODEL} • Generated: {stamp}</div>'
 
 def _unwrap_fences(s: str) -> str:
     s = s.strip()
@@ -55,35 +39,41 @@ def _unwrap_fences(s: str) -> str:
 def _wrap_if_needed(html: str) -> str:
     if "<html" in html.lower() and "</html>" in html.lower():
         return html
-    # Minimal shell around fragment (LIVE content)
+    # Minimal, clean shell – email-safe CSS
     return f"""<!doctype html>
 <html lang="en"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>ReplicaRivals — Weekly Snapshot ({window_str})</title>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ReplicaRivals — Weekly Snapshot ({WINDOW_STR})</title>
 <style>
   body{{font-family:Inter,Arial,Helvetica,sans-serif;color:#111;background:#fff}}
   .container{{max-width:920px;margin:0 auto;border:1px solid #e5e7eb;border-radius:10px}}
   .section{{padding:18px 20px}}
-  table{{border-collapse:collapse;width:100%}}
-  th,td{{padding:8px;vertical-align:top;border-bottom:1px solid #e5e7eb}}
-  .tl-dr{{background:#f6f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:12px}}
+  h2{{margin:0 0 6px;font-size:22px}}
+  h3{{margin:0 0 8px;font-size:18px}}
+  .tl-dr{{margin-top:10px;background:#f6f8fa;border:1px solid #e5e7eb;border-radius:8px;padding:12px}}
+  table{{border-collapse:collapse;width:100%;font-size:14px}}
+  th,td{{padding:8px;vertical-align:top}}
+  thead tr{{background:#111;color:#fff}}
+  tbody tr{{border-bottom:1px solid #e5e7eb}}
+  .tag{{padding:2px 6px;border-radius:999px;display:inline-block;font-size:12px}}
+  .tag-fyi{{background:#fef9c3;color:#854d0e}}
+  .tag-watch{{background:#e0f2fe;color:#0369a1}}
+  .tag-action{{background:#dcfce7;color:#166534}}
   a{{color:#0e4cf5;text-decoration:none}} a:hover{{text-decoration:underline}}
+  .footer{{color:#666;font-size:12px}}
 </style>
-</head><body><div class="container"><div class="section">
-{html}
-</div></div></body></html>"""
+</head><body>
+<div class="container"><div class="section">{html}</div></div>
+</body></html>"""
 
 def _write(html: str) -> None:
-    final = html.replace("</body>", f"{_badge(MODEL)}</body>") if "</body>" in html.lower() else (html + _badge(MODEL))
+    final = html.replace("</body>", f"{_badge()}</body>") if "</body>" in html.lower() else (html + _badge())
     with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
         f.write(final)
     sys.stdout.write(final)
 
 def _load_yaml(path: str) -> dict:
-    try:
-        import yaml  # PyYAML
-    except Exception as e:
-        raise RuntimeError("PyYAML not installed; add pyyaml to your workflow") from e
+    import yaml
     if not os.path.exists(path):
         return {}
     with open(path, "r", encoding="utf-8") as f:
@@ -95,70 +85,90 @@ def _load_text(path: str) -> str:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         return f.read().strip()
 
+def _j(items): 
+    return "; ".join(items) if items else "(none)"
+
 def _render_context(cfg: dict) -> str:
-    # Make compact bullet strings the model can follow
-    company     = cfg.get("company_name") or "Replica (assumed)"
-    industry    = cfg.get("industry") or ""
-    icps        = cfg.get("icps") or []
-    regions     = cfg.get("regions") or []
-    pillars     = cfg.get("product_pillars") or []
-    competitors = cfg.get("competitors") or []
-    ignore_comps= cfg.get("ignore_competitors") or []
-    focus       = cfg.get("focus_areas") or []
-    banned      = cfg.get("out_of_scope") or []
-    sources     = cfg.get("allowed_sources") or []
-    # brand anchors (from your internal doc)
-    anchors     = cfg.get("positioning_anchors") or [
+    company      = cfg.get("company_name") or "Replica"
+    industry     = cfg.get("industry") or ""
+    icps         = cfg.get("icps") or []
+    regions      = cfg.get("regions") or []
+    pillars      = cfg.get("product_pillars") or []
+    anchors      = cfg.get("positioning_anchors") or [
         "Anonymous attack surface","Instant deployment",
         "Cross-team collaboration","Enterprise control with operational privacy"
     ]
+    competitors  = cfg.get("competitors") or []
+    ignore_comps = cfg.get("ignore_competitors") or []
+    focus        = cfg.get("focus_areas") or []
+    allowed_src  = cfg.get("allowed_sources") or []
 
-    def j(items): return "; ".join(items) if items else "(none)"
     lines = [
         f"Company: {company}",
         f"Industry: {industry}",
-        f"ICPs/personas: {j(icps)}",
-        f"Regions: {j(regions)}",
-        f"Product pillars: {j(pillars)}",
-        f"Positioning anchors: {j(anchors)}",
-        f"Competitors of record (cover these): {j(competitors)}",
-        f"Ignore/do not cover: {j(ignore_comps)}",
-        f"Priority focus areas: {j(focus)}",
-        f"Out-of-scope (skip unless truly material): {j(banned)}",
-        f"Allowed/priority sources (prefer these for links): {j(sources)}",
+        f"ICPs/personas: {_j(icps)}",
+        f"Regions: {_j(regions)}",
+        f"Product pillars: {_j(pillars)}",
+        f"Positioning anchors: {_j(anchors)}",
+        f"Competitors of record (cover these, and only these unless decisively material): {_j(competitors)}",
+        f"Ignore/do not cover: {_j(ignore_comps)}",
+        f"Priority focus areas: {_j(focus)}",
+        f"Preferred sources for links: {_j(allowed_src)}",
     ]
     return "\n".join(lines)
 
-def _prompt(cfg: dict, notes: str) -> tuple[str,str]:
+def _build_prompts(cfg: dict, notes: str) -> tuple[str, str]:
     context_block = _render_context(cfg)
-    system = (
-        "You are a competitive intelligence analyst for the company below.\n"
-        "STRICTLY follow the provided competitor list and scope; do not include unrelated companies.\n"
-        "Return EMAIL-READY HTML only (no markdown fences), with inline styles or simple tags.\n"
-        "Must include sections:\n"
-        " • TL;DR (bulleted)\n"
-        " • Key Events table (Date, Competitor, Theme, What happened, Why it matters, Tag, Source link)\n"
-        " • Deltas vs prior week\n"
-        " • Recommended actions (Exec, Sales, Marketing, Product)\n"
-        "Be concise, links must be direct and plausible; avoid placeholders, avoid speculation.\n"
-        "If a required section has no material items this week, explicitly say 'No material updates'."
-    )
+
+    # ---- Style guide & rubric to force crisp, useful output ----
+    style = f"""
+YOU ARE: A skeptical competitive intelligence analyst for the company below.
+GOAL: Produce an executive-grade weekly brief that a VP can scan in 60 seconds.
+
+ABSOLUTE RULES:
+- No placeholders. No speculation. Every claim must be specific and customer-relevant.
+- Cover ONLY in-scope competitors and themes (see COMPANY CONTEXT). Ignore noise.
+- Keep it tight and scannable; remove fluff and duplicate ideas.
+
+FORMAT (HTML ONLY, NO MARKDOWN FENCES):
+1) Header line with coverage window: "{WINDOW_STR}".
+2) TL;DR:
+   - 3–4 bullets, each ≤ 20 words, focusing on deltas vs prior state, impact, and urgency.
+3) Key Events (by Competitor):
+   - A table with EXACT columns: Date (ET), Competitor, Theme, What happened, Why it matters, Tag, Source.
+   - 3–8 rows max. 'Tag' must be one of: FYI, Watch, Action.
+   - 'Source' must include at least one working <a href="...">Name</a> link per row.
+4) Deltas vs. Prior Week: 2–4 bullets that contrast this week vs last week.
+5) Recommended Actions (by Function):
+   - Exec, Sales, Marketing, Product. 2 bullets each.
+   - Make actions specific & testable (who/what/expected impact).
+6) Footer: cite sources list (domain names allowed) + positioning anchors.
+
+SCORING RUBRIC (optimize your output to score 5/5 on each):
+- Relevance (5): Only in-scope competitors/themes, clearly tied to ICP needs.
+- Specificity (5): Concrete facts (dates, product names, SKUs, SKUs/tiers, SKUs/pricing, doc pages).
+- Impact (5): Why it matters for pipeline, win/loss, pricing, or roadmap.
+- Brevity (5): No bullet > 20 words in TL;DR; avoid repetition.
+- Evidence (5): Every table row has a credible source link (prefer: {_j(cfg.get('allowed_sources', []))}).
+
+If a section truly has no relevant updates this week, write: "No material updates."
+"""
     user = textwrap.dedent(f"""
-        COMPANY CONTEXT
-        ----------------
-        {context_block}
+COMPANY CONTEXT
+---------------
+{context_block}
 
-        NOTES / SEEDS (optional)
-        ------------------------
-        {notes if notes else "(none)"}
+NOTES / SEEDS (optional)
+------------------------
+{notes if notes else "(none)"}
 
-        TASK
-        ----
-        Generate this week's snapshot covering {window_str}.
-        Only include competitors/themes within scope. Keep width under ~900px.
-        Return HTML only (no ``` fences).
+TASK
+----
+Generate this week's snapshot covering {WINDOW_STR} for Exec, Sales, Marketing, and Product.
+Return HTML only (no ``` fences). Keep width under ~900px.
     """).strip()
-    return system, user
+
+    return style.strip(), user
 
 def generate_html() -> str:
     if not (LLM_API_BASE and LLM_API_KEY):
@@ -166,15 +176,15 @@ def generate_html() -> str:
 
     cfg   = _load_yaml(CONF_PATH)
     notes = _load_text(NOTES_PATH)
-    system, user = _prompt(cfg, notes)
+    system, user = _build_prompts(cfg, notes)
 
-    # Log the loaded competitor list for debugging
-    loaded = {
+    # Log the loaded scope for debugging
+    dbg = {
         "competitors": cfg.get("competitors", []),
         "ignore_competitors": cfg.get("ignore_competitors", []),
         "focus_areas": cfg.get("focus_areas", []),
     }
-    print("[weekly_snapshot2] Loaded context:", json.dumps(loaded), file=sys.stderr)
+    print("[weekly_snapshot2] Context:", json.dumps(dbg), file=sys.stderr)
 
     from litellm import completion
     resp = completion(
@@ -183,7 +193,7 @@ def generate_html() -> str:
                   {"role": "user", "content": user}],
         api_base=LLM_API_BASE,
         api_key=LLM_API_KEY,
-        custom_llm_provider="openai",
+        custom_llm_provider="openai",  # OpenAI-compatible endpoint (e.g., OpenRouter)
         extra_headers={
             "HTTP-Referer": "https://github.com/OWNER/REPO",
             "X-Title": "ReplicaRivals Weekly Snapshot"
@@ -195,6 +205,8 @@ def generate_html() -> str:
     content = _unwrap_fences(content).strip()
     if not content:
         raise RuntimeError("Model returned empty content")
+
+    # Ensure we send valid HTML
     html = _wrap_if_needed(content)
     return html
 
