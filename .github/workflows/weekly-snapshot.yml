@@ -6,68 +6,123 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
+    concurrency:
+      group: weekly-snapshot-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      PYTHONUNBUFFERED: "1"
+      # your secrets mapped to env for reuse
+      OPENR_BASE: ${{ secrets.OPENR_BASE }}
+      OPENR_API:  ${{ secrets.OPENR_API }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      EMAIL_TO: ${{ secrets.EMAIL_TO }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
 
     steps:
-      - name: Checkout repo
+      - name: 🔹 Start — context & runner sanity
+        run: |
+          echo "Repo: $GITHUB_REPOSITORY"
+          echo "Ref:  $GITHUB_REF"
+          echo "SHA:  $GITHUB_SHA"
+          echo "Runner: $RUNNER_OS / $RUNNER_ARCH"
+          echo "Timestamp: $(date -u)"
+
+      - name: 🔹 Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: 🔹 Preflight — required secrets present
         run: |
+          ok=1
+          for v in OPENR_BASE OPENR_API EMAIL_FROM EMAIL_TO EMAIL_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "❌ Missing $v"; ok=0; else echo "✅ $v set"; fi
+          done
+          if [ $ok -eq 0 ]; then echo "Secrets missing → abort"; exit 1; fi
+
+      - name: 🔹 Install dependencies
+        run: |
+          python -VV
           python -m pip install --upgrade pip
           python -m pip install "openai==0.28.1" litellm PyGithub requests python-dotenv
+          python -c "import sys; print('site:', sys.path[0])"
 
-      - name: Run weekly snapshot (OpenRouter via LiteLLM)
+      - name: 🔹 Locate weekly_snapshot2.py
+        id: locate
+        run: |
+          echo "Tree (top-level):"; ls -la
+          echo "Searching for weekly_snapshot2.py..."
+          SCRIPT=$(git ls-files | grep -E '(^|/)(weekly[_-]?snapshot2)\.py$' | head -n1 || true)
+          if [ -z "$SCRIPT" ]; then
+            echo "❌ Could not find weekly_snapshot2.py in repo"
+            exit 1
+          fi
+          echo "✅ Found: $SCRIPT"
+          echo "script=$SCRIPT" >> "$GITHUB_OUTPUT"
+
+      - name: 🔹 Run weekly snapshot (OpenRouter via LiteLLM)
         env:
-          # your secrets (provider)
-          LLM_API_BASE: ${{ secrets.OPENR_BASE }}
-          LLM_API_KEY:  ${{ secrets.OPENR_API }}
+          LLM_API_BASE: ${{ env.OPENR_BASE }}
+          LLM_API_KEY:  ${{ env.OPENR_API }}
           MODEL: openrouter/auto
           MAX_TOKENS: "800"
           TEMP: "0.2"
           OUTPUT_HTML: report.html
-          # keep OpenAI path available for later
           USE_OPENAI: "false"
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ env.OPENAI_API_KEY }}
         run: |
-          python weekly_snapshot2.py > report.html
+          set -e
+          echo "Running: ${{ steps.locate.outputs.script }}"
+          python "${{ steps.locate.outputs.script }}" > report.html
+          echo "Report size: $(wc -c < report.html) bytes"
 
-      - name: Upload report artifact
+      - name: 🔹 Upload report artifact
         uses: actions/upload-artifact@v4
         with:
           name: weekly-snapshot
           path: report.html
 
-      # ---- EMAIL: Gmail (uses App Password) ----
-      - name: Email report via Gmail SMTP
-        if: ${{ contains(secrets.EMAIL_FROM, '@gmail.com') }}
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server: smtp.gmail.com
-          port: 587
-          secure: true
-          username: ${{ secrets.EMAIL_FROM }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "ReplicaRivals — Weekly Competitive Snapshot"
-          from: ${{ secrets.EMAIL_FROM }}
-          to: ${{ secrets.EMAIL_TO }}
-          html_body: file://report.html
+      - name: 🔹 Email report via Gmail (inline SMTP)
+        env:
+          EMAIL_FROM: ${{ env.EMAIL_FROM }}
+          EMAIL_TO: ${{ env.EMAIL_TO }}
+          EMAIL_PASSWORD: ${{ env.EMAIL_PASSWORD }}
+        run: |
+          python - <<'PY'
+import os, sys, smtplib, ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-      # ---- EMAIL: Office365 / other SMTP ----
-      - name: Email report via Office365 SMTP
-        if: ${{ !contains(secrets.EMAIL_FROM, '@gmail.com') }}
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server: smtp.office365.com
-          port: 587
-          secure: true
-          username: ${{ secrets.EMAIL_FROM }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: "ReplicaRivals — Weekly Competitive Snapshot"
-          from: ${{ secrets.EMAIL_FROM }}
-          to: ${{ secrets.EMAIL_TO }}
-          html_body: file://report.html
+sender = os.environ.get("EMAIL_FROM")
+recips = [e.strip() for e in os.environ.get("EMAIL_TO","").split(",") if e.strip()]
+app_pw = os.environ.get("EMAIL_PASSWORD")
+
+print("From:", sender)
+print("To:", recips)
+if not (sender and recips and app_pw):
+    print("Missing EMAIL_FROM/EMAIL_TO/EMAIL_PASSWORD"); sys.exit(1)
+
+with open("report.html","r",encoding="utf-8") as f:
+    html = f.read()
+
+msg = MIMEMultipart("alternative")
+msg["Subject"] = "ReplicaRivals — Weekly Competitive Snapshot"
+msg["From"] = sender
+msg["To"] = ", ".join(recips)
+msg.attach(MIMEText(html, "html", "utf-8"))
+
+context = ssl.create_default_context()
+with smtplib.SMTP("smtp.gmail.com", 587, timeout=60) as server:
+    server.ehlo()
+    server.starttls(context=context)
+    server.ehlo()
+    server.login(sender, app_pw)
+    server.sendmail(sender, recips, msg.as_string())
+
+print("✅ Email sent.")
+PY
 
 
 
