@@ -1,53 +1,60 @@
+name: Weekly Snapshot
 
-# filename: weekly_snapshot.py
+on:
+  workflow_dispatch:
+  schedule:
+    # Fridays during Daylight Time (EDT = UTC-4): 13:00 UTC == 09:00 ET
+    - cron: "0 9 * * FRI"
+    # Fridays during Standard Time (EST = UTC-5): 14:00 UTC == 09:00 ET
+    - cron: "0 14 * * FRI"
 
-import openai
-import smtplib
-from email.mime.text import MIMEText
-import os
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
-# Environment variables
-openai.api_key = os.getenv("OPENAI_API_KEY")
-EMAIL_FROM = os.getenv("EMAIL_FROM")
-EMAIL_TO = os.getenv("EMAIL_TO")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-# Define the snapshot prompt
-prompt = """
-Please generate this week's competitive snapshot in HTML format.
+      # Gate: only continue if it's Friday 09:00 in America/New_York
+      - name: Ensure it's 09:00 Friday in New York
+        run: |
+          ny_wday=$(TZ=America/New_York date +%u) # 5 = Friday
+          ny_hour=$(TZ=America/New_York date +%H) # 09 = 9am
+          echo "NY weekday=$ny_wday hour=$ny_hour"
+          if [ "$ny_wday" != "5" ] || [ "$ny_hour" != "09" ]; then
+            echo "Not 09:00 Friday in New York—exiting."
+            exit 0
+          fi
 
-Company: Replica
-Competitors: Menlo Security, Cyberinc, Cloudflare Browser Isolation, Authentic8 (Silo), Kasm Technologies, Fortanix, NetAbstraction
-Regions: North America, EU
-Focus Areas: Partnerships, Product Releases, Hiring, M&A, Posted Marketing Content
-Audience: Executive team, Sales, Product, Marketing
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-Use the following HTML structure:
-- TL;DR summary
-- Table with key events (date, company, event summary with link, tag)
-- Role-based takeaways (Marketing, Sales, Product, ELT)
-"""
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            python -m pip install -r requirements.txt
+          else
+            python -m pip install openai PyGithub requests python-dotenv
+          fi
 
-# Call OpenAI with HTML format request
-response = openai.ChatCompletion.create(
-    model="gpt-4",
-    messages=[
-        {"role": "system", "content": "You are ReplicaRivals, a competitive intelligence agent. Respond in clean HTML email format only."},
-        {"role": "user", "content": prompt}
-    ],
-    temperature=0.3,
-    max_tokens=1800
-)
+      - name: Run weekly snapshot
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python weekly_snapshot.py
 
-html_content = response['choices'][0]['message']['content']
-
-# Create HTML email
-msg = MIMEText(html_content, "html")
-msg["Subject"] = "ReplicaRivals – Weekly Competitive Snapshot"
-msg["From"] = EMAIL_FROM
-msg["To"] = EMAIL_TO
-
-# Send via Gmail SMTP
-with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-    server.login(EMAIL_FROM, EMAIL_PASSWORD)
-    server.send_message(msg)
+      - name: Upload report artifact (optional)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-snapshot
+          path: |
+            report.html
+            output/**
+          if-no-files-found: ignore
