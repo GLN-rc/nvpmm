@@ -1,0 +1,58 @@
+company_name: Replica
+industry: Cybersecurity — isolated environments, managed attribution, secure research
+
+icps:
+  - Security leaders (CISO, VP/Dir SecOps, Security Architecture)
+  - Threat intel / OSINT & IR (TI, CTI, DFIR, Red/Purple)
+  - Investigations / Trust & Safety (fraud, abuse, AML/FCI)
+  - Sensitive business programs (M&A, strategy, R&D leadership)
+
+regions: [ North America, EU, Fed/SLG ]
+
+product_pillars:
+  - Anonymous attack surface & managed attribution
+  - Instant, SaaS-delivered isolated environments
+  - Cross-team collaboration & secure data exchange
+  - Enterprise governance, observability & compliance
+
+# >>> These two lists drive coverage. Keep them tight. <<<
+competitors:
+  - Menlo Security
+  - Authentic8 (Silo)
+  - Cloudflare (Zero Trust / Browser Isolation)
+  - Kasm Technologies
+  - Island (Enterprise Browser)
+  - Hypori (BYOD isolation)
+  - NetAbstraction (Managed Attribution)
+
+ignore_competitors:
+  - SASE vendors without isolation/MAAT
+  - Generic VPNs or consumer browsers
+  - MDR-only or SIEM/SOAR tools unrelated to isolation/MAAT
+
+focus_areas:
+  - Product launches & roadmap deltas (isolation, MAAT, audit/obs, data controls)
+  - Pricing/packaging changes impacting enterprise/Fed deals
+  - Partnerships (hyperscalers, DFIR/MSSP, GSIs, threat intel feeds, egress)
+  - Security incidents & regulatory drivers (CISA KEV/BODs, EU/US AI guidance)
+  - Certifications & accreditations (ATO/FedRAMP/FIPS/SOC2/ISO)
+  - Enterprise wins & high-signal case studies in F100/Fed
+
+out_of_scope:
+  - SMB-only tools
+  - Consumer browsers or privacy apps without enterprise control
+  - Point tools for file sharing or chat that lack isolation/governance
+
+# Prefer these domains for citations/links inside narratives
+allowed_sources:
+  - cisa.gov
+  - nist.gov
+  - developers.cloudflare.com
+  - menlosecurity.com
+  - authentic8.com
+  - kasmweb.com
+  - hypori.com
+  - netabstraction.com
+  - reddit.com
+  - linkedin.com
+  
