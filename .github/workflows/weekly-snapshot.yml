@@ -20,21 +20,17 @@ jobs:
 
       - name: Run weekly snapshot
         env:
-          # LiteLLM provider (e.g., OpenRouter)
-          OPENR_BASE: ${{ secrets.OPENR_BASE }}   # e.g. https://openrouter.ai/api/v1
-          OPENR_API:  ${{ secrets.OPENR_API }}
+          LLM_API_BASE: ${{ secrets.OPENR_BASE }}   # you set this
+          LLM_API_KEY:  ${{ secrets.OPENR_API }}    # you set this
           MODEL: openrouter/auto
           MAX_TOKENS: "800"
           TEMP: "0.2"
           OUTPUT_HTML: report.html
-
-          # OpenAI (optional for later switch-back)
           USE_OPENAI: "false"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_ORG: ${{ secrets.OPENAI_ORG }}
         run: |
           python weekly_snapshot2.py > report.html
-
       - name: Upload report artifact
         uses: actions/upload-artifact@v4
         with:
