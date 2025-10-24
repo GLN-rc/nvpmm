@@ -12,7 +12,7 @@ regions: [ North America, EU, Fed/SLG ]
 product_pillars:
   - Anonymous attack surface & managed attribution
   - Instant, SaaS-delivered isolated environments
-  - Cross-team collaboration & secure data exchange
+  - Cross-team collaboration & secure data exchange & file sharing
   - Enterprise governance, observability & compliance
 
 # >>> These two lists drive coverage. Keep them tight. <<<
