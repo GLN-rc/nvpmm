@@ -11,8 +11,8 @@ Goals
 Env vars (set in GitHub Actions step)
 - USE_OPENAI: "true" | "false"  (default false → LiteLLM path)
 - MODEL: model id (default: openrouter/auto; e.g., deepseek/deepseek-chat)
-- LLM_API_BASE: e.g., https://openrouter.ai/api/v1
-- LLM_API_KEY: provider key
+- OPENR_BASE: e.g., https://openrouter.ai/api/v1
+- OPENR_API: provider key
 - OPENAI_API_KEY: (only when USE_OPENAI=true)
 - OPENAI_ORG: optional
 - MAX_TOKENS: int (default 800)
@@ -54,9 +54,9 @@ def chat(messages: list[dict]) -> tuple[str, str]:
     if USE_OPENAI:
         # OpenAI legacy SDK path (requires openai==0.28.1)
         import openai
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = os.environ.get("OPENR_API")
         if not api_key:
-            raise RuntimeError("OPENAI_API_KEY is not set while USE_OPENAI=true")
+            raise RuntimeError("OPENR_API is not set while USE_OPENAI=true")
         openai.api_key = api_key
         if os.getenv("OPENAI_ORG"):
             openai.organization = os.environ["OPENAI_ORG"]
@@ -71,10 +71,10 @@ def chat(messages: list[dict]) -> tuple[str, str]:
     else:
         # LiteLLM path (provider-agnostic, OpenAI-compatible)
         from litellm import completion
-        api_base = os.environ.get("LLM_API_BASE")
-        api_key  = os.environ.get("LLM_API_KEY")
+        api_base = os.environ.get("OPENR_BASE")
+        api_key  = os.environ.get("OPENR_API")
         if not api_base or not api_key:
-            raise RuntimeError("LLM_API_BASE and LLM_API_KEY must be set for LiteLLM path")
+            raise RuntimeError("OPENR_BASE and OPENR_API must be set for LiteLLM path")
         r = completion(
             model=MODEL,
             messages=messages,
