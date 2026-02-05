@@ -637,12 +637,59 @@ class WebsiteScanner {
         return parts[0]?.trim() || 'Your Company';
     }
 
-    exportReport() {
+    async exportReport() {
         if (!this.currentResults) {
             alert('No results to export');
             return;
         }
 
+        const btn = document.getElementById('export-btn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Generating...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('/api/export-docx', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(this.currentResults)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate document');
+            }
+
+            // Get the blob from response
+            const blob = await response.blob();
+
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `website-optimization-report-${new Date().toISOString().split('T')[0]}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            btn.textContent = 'Downloaded!';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 2000);
+
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('Error generating report. Please try again.');
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // Legacy text export - kept for reference
+    _exportReportText() {
         const results = this.currentResults;
         const analysis = results.your_site_analysis || {};
         const seo = analysis.seo_factors || {};
