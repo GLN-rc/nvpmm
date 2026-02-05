@@ -17,6 +17,7 @@ import uvicorn
 from scraper import WebsiteScraper
 from analyzer import OptimizationAnalyzer
 from document_processor import DocumentProcessor
+from metric_explanations import generate_metric_insights, get_all_explanations
 
 app = FastAPI(
     title="Website Competitor Scanner",
@@ -125,13 +126,18 @@ async def scan_websites(
             focus_areas=areas
         )
 
-        return AnalysisResponse(
-            status="success",
-            your_site_analysis=your_site_data,
-            competitor_analyses=competitor_data,
-            recommendations=recommendations["recommendations"],
-            priority_actions=recommendations["priority_actions"]
-        )
+        # Generate metric insights with explanations
+        metric_insights = generate_metric_insights(your_site_data, competitor_data)
+
+        return {
+            "status": "success",
+            "your_site_analysis": your_site_data,
+            "competitor_analyses": competitor_data,
+            "recommendations": recommendations["recommendations"],
+            "priority_actions": recommendations["priority_actions"],
+            "metric_insights": metric_insights,
+            "metric_explanations": get_all_explanations()
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

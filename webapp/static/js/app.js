@@ -205,14 +205,17 @@ class WebsiteScanner {
         this.resultsSection.classList.add('active');
         this.resultsSection.style.display = 'block';
 
+        // Store metric explanations for tooltips
+        this.metricExplanations = results.metric_explanations || {};
+
         // Render priority actions
         this.renderPriorityActions(results.priority_actions);
 
         // Render all recommendations
         this.renderRecommendations(results.recommendations);
 
-        // Render site analysis
-        this.renderSiteAnalysis(results.your_site_analysis);
+        // Render site analysis with explanations
+        this.renderSiteAnalysis(results.your_site_analysis, results.metric_insights);
 
         // Render competitor comparison
         this.renderCompetitorComparison(results.your_site_analysis, results.competitor_analyses);
@@ -239,7 +242,15 @@ class WebsiteScanner {
                         <span class="badge badge-impact-${action.impact}">Impact: ${action.impact}</span>
                         <span class="badge badge-effort-${action.effort}">Effort: ${action.effort}</span>
                     </p>
-                    ${action.first_step ? `<p style="margin-top: 8px;"><strong>First step:</strong> ${action.first_step}</p>` : ''}
+                    ${action.description ? `<p style="margin-top: 8px; color: #666;">${action.description}</p>` : ''}
+                    ${action.all_actions && action.all_actions.length > 0 ? `
+                        <div style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 6px;">
+                            <strong style="font-size: 0.85rem;">Action steps:</strong>
+                            <ul style="margin: 5px 0 0 20px; font-size: 0.85rem;">
+                                ${action.all_actions.map(a => `<li>${a}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : (action.first_step ? `<p style="margin-top: 8px;"><strong>First step:</strong> ${action.first_step}</p>` : '')}
                 </div>
             </div>
         `).join('');
@@ -281,7 +292,7 @@ class WebsiteScanner {
         `).join('');
     }
 
-    renderSiteAnalysis(analysis) {
+    renderSiteAnalysis(analysis, metricInsights) {
         const metricsContainer = document.getElementById('site-metrics');
         const issuesList = document.getElementById('issues-list');
         const strengthsList = document.getElementById('strengths-list');
@@ -295,9 +306,36 @@ class WebsiteScanner {
         const tech = analysis.technical_factors || {};
         const llm = analysis.llm_discoverability || {};
         const geo = analysis.geo_factors || {};
+        const explanations = this.metricExplanations || {};
+
+        // Helper to get explanation
+        const getExp = (key) => explanations[key] || {};
+
+        // Render metric insights first if available
+        let insightsHtml = '';
+        if (metricInsights && metricInsights.length > 0) {
+            insightsHtml = `
+                <div class="analysis-card" style="grid-column: 1 / -1; background: linear-gradient(135deg, #fff9e6 0%, #fff 100%); border-left: 4px solid var(--persimmon);">
+                    <h4 style="color: var(--persimmon); margin-bottom: 15px;">Key Insights vs Competitors</h4>
+                    ${metricInsights.map(insight => `
+                        <div style="margin-bottom: 15px; padding: 12px; background: white; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <strong>${getExp(insight.metric)?.name || insight.metric}</strong>
+                                <span class="badge ${insight.status === 'behind' ? 'badge-impact-high' : 'badge-impact-low'}">${insight.status === 'behind' ? 'Needs Work' : 'Ahead'}</span>
+                            </div>
+                            <p style="font-size: 0.9rem; color: #666; margin-bottom: 8px;">
+                                <strong>You:</strong> ${insight.your_value} | <strong>Competitors:</strong> ${insight.competitor_avg}
+                            </p>
+                            <p style="font-size: 0.85rem; color: #888; margin-bottom: 8px;"><em>Why it matters:</em> ${insight.explanation}</p>
+                            <p style="font-size: 0.85rem; color: var(--olive-green);"><strong>Recommendation:</strong> ${insight.recommendation}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
 
         // Metrics cards
-        metricsContainer.innerHTML = `
+        metricsContainer.innerHTML = insightsHtml + `
             <div class="analysis-card">
                 <h4>SEO Factors</h4>
                 <div class="metric">

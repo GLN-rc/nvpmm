@@ -453,9 +453,82 @@ Prioritize recommendations that:
             })
             rec_id += 1
 
+        # Add Messaging & Copy recommendations
+        if rec_id <= 15:
+            recommendations.append({
+                "id": rec_id,
+                "category": "Messaging",
+                "title": "Strengthen Value Proposition",
+                "description": "Make your unique value clear in the first 5 seconds. Visitors should immediately understand what you do and why it matters to them.",
+                "impact": "high",
+                "effort": "medium",
+                "specific_actions": [
+                    "Lead with the customer problem you solve, not your product features",
+                    "Use specific, quantifiable benefits (e.g., '10x faster' not 'faster')",
+                    "Include a clear differentiator from competitors in your headline",
+                    "Test your headline: Can someone understand your value in 5 seconds?"
+                ],
+                "expected_outcome": "Lower bounce rate, higher engagement"
+            })
+            rec_id += 1
+
+        if rec_id <= 15:
+            recommendations.append({
+                "id": rec_id,
+                "category": "Messaging",
+                "title": "Add Social Proof & Trust Signals",
+                "description": "Build credibility with evidence that others trust you. AI systems also favor content with authoritative signals.",
+                "impact": "high",
+                "effort": "medium",
+                "specific_actions": [
+                    "Add customer logos or 'Trusted by X companies' section",
+                    "Include specific testimonials with names and titles",
+                    "Display security certifications, compliance badges, or awards",
+                    "Add case study snippets with measurable outcomes"
+                ],
+                "expected_outcome": "Increased trust and conversion rates"
+            })
+            rec_id += 1
+
+        if rec_id <= 15:
+            recommendations.append({
+                "id": rec_id,
+                "category": "Messaging",
+                "title": "Clarify Your Differentiation",
+                "description": "Help visitors understand why to choose you over alternatives. This is critical for both humans and AI recommendations.",
+                "impact": "high",
+                "effort": "medium",
+                "specific_actions": [
+                    "Create a 'Why Us' or 'How We're Different' section",
+                    "Use comparison language: 'Unlike X, we...' or 'The only solution that...'",
+                    "Highlight your unique methodology, technology, or approach",
+                    "Address common objections proactively"
+                ],
+                "expected_outcome": "Better competitive positioning in search and AI results"
+            })
+            rec_id += 1
+
+        if rec_id <= 15:
+            recommendations.append({
+                "id": rec_id,
+                "category": "Messaging",
+                "title": "Optimize Call-to-Action Copy",
+                "description": "Your CTAs should be specific and value-focused, not generic. 'Get Started' tells nothing; 'Start Your Free Security Audit' tells everything.",
+                "impact": "medium",
+                "effort": "low",
+                "specific_actions": [
+                    "Replace generic CTAs ('Learn More', 'Get Started') with specific ones",
+                    "Include the benefit in the CTA: 'See How Much You Can Save'",
+                    "Add urgency or specificity: 'Get Your Report in 2 Minutes'",
+                    "Test different CTA variations"
+                ],
+                "expected_outcome": "Higher click-through and conversion rates"
+            })
+            rec_id += 1
+
         # Address competitive gaps
         for gap in gaps[:3]:
-            if rec_id <= 12:
+            if rec_id <= 18:
                 recommendations.append({
                     "id": rec_id,
                     "category": "Competitive",
@@ -481,7 +554,15 @@ Prioritize recommendations that:
 
         # Score and sort recommendations
         scored = []
+        seen_titles = set()  # Track titles to avoid duplicates
+
         for rec in recommendations:
+            # Skip duplicates
+            title = rec.get("title", "")
+            if title in seen_titles:
+                continue
+            seen_titles.add(title)
+
             score = 0
             # Impact scoring
             if rec.get("impact") == "high":
@@ -500,15 +581,15 @@ Prioritize recommendations that:
                 score += 5
 
             # Category bonuses
-            if rec.get("category") in ["GEO", "LLM"]:
-                score += 10  # Prioritize AI-related optimizations
+            if rec.get("category") in ["GEO", "LLM", "Messaging"]:
+                score += 10  # Prioritize AI and messaging optimizations
 
             scored.append((score, rec))
 
         # Sort by score descending
         scored.sort(key=lambda x: x[0], reverse=True)
 
-        # Take top 5 as priority actions
+        # Take top 5 as priority actions (no duplicates)
         for i, (score, rec) in enumerate(scored[:5]):
             priority_actions.append({
                 "priority": i + 1,
@@ -516,7 +597,9 @@ Prioritize recommendations that:
                 "category": rec.get("category"),
                 "impact": rec.get("impact"),
                 "effort": rec.get("effort"),
-                "first_step": rec.get("specific_actions", [""])[0] if rec.get("specific_actions") else ""
+                "first_step": rec.get("specific_actions", [""])[0] if rec.get("specific_actions") else "",
+                "description": rec.get("description", ""),
+                "all_actions": rec.get("specific_actions", [])
             })
 
         return priority_actions
