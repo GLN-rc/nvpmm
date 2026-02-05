@@ -205,11 +205,21 @@ class WebsiteScanner {
         this.resultsSection.classList.add('active');
         this.resultsSection.style.display = 'block';
 
+        // Store results for export
+        this.currentResults = results;
+
         // Store metric explanations for tooltips
         this.metricExplanations = results.metric_explanations || {};
 
+        // Show which URL was analyzed
+        const analyzedUrl = results.your_site_analysis?.url || 'Unknown';
+        document.getElementById('analyzed-url').textContent = `Page analyzed: ${analyzedUrl}`;
+
         // Render priority actions
         this.renderPriorityActions(results.priority_actions);
+
+        // Render copy suggestions
+        this.renderCopySuggestions(results.your_site_analysis, results.recommendations);
 
         // Render all recommendations
         this.renderRecommendations(results.recommendations);
@@ -219,6 +229,9 @@ class WebsiteScanner {
 
         // Render competitor comparison
         this.renderCompetitorComparison(results.your_site_analysis, results.competitor_analyses);
+
+        // Set up export button
+        document.getElementById('export-btn')?.addEventListener('click', () => this.exportReport());
 
         // Scroll to results
         this.resultsSection.scrollIntoView({ behavior: 'smooth' });
@@ -509,6 +522,259 @@ class WebsiteScanner {
                 </table>
             </div>
         `;
+    }
+
+    renderCopySuggestions(analysis, recommendations) {
+        const container = document.getElementById('copy-suggestions-list');
+        if (!container) return;
+
+        const seo = analysis?.seo_factors || {};
+        const currentTitle = seo.title || '';
+        const currentH1 = seo.h1_tags?.[0] || '';
+
+        // Generate specific copy suggestions
+        const suggestions = [];
+
+        // Title suggestions
+        suggestions.push({
+            category: "Page Title",
+            current: currentTitle || "(No title found)",
+            suggestions: [
+                `${this.extractCompanyName(currentTitle)} | Secure Isolated Browsing for Enterprise`,
+                `Enterprise Browser Isolation | Protect Against Web Threats | ${this.extractCompanyName(currentTitle)}`,
+                `Zero-Trust Web Security | ${this.extractCompanyName(currentTitle)} - Isolated Browsing Solution`
+            ],
+            why: "Titles should be 50-60 chars, include primary keyword near start, and communicate value."
+        });
+
+        // Headline/H1 suggestions
+        suggestions.push({
+            category: "Main Headline (H1)",
+            current: currentH1 || "(No H1 found)",
+            suggestions: [
+                "Protect Your Enterprise from Web-Based Threats with Isolated Browsing",
+                "Browse Securely. Work Confidently. Zero Trust Made Simple.",
+                "The Only Browser Isolation Platform Built for [Your Specific Differentiator]"
+            ],
+            why: "Your headline should pass the 5-second test: Can visitors immediately understand what you do and why it matters?"
+        });
+
+        // Meta description suggestions
+        suggestions.push({
+            category: "Meta Description",
+            current: seo.meta_description || "(No meta description found)",
+            suggestions: [
+                "Replica Cyber provides enterprise browser isolation that protects your team from web threats without slowing them down. See a demo in 2 minutes.",
+                "Stop web-based attacks before they reach your network. Replica Cyber's isolated browsing keeps threats contained. Request a free security assessment.",
+                "Join 500+ enterprises using Replica Cyber for zero-trust web security. 99.9% threat prevention rate. Book your demo today."
+            ],
+            why: "Meta descriptions are your ad copy in search results. Include a CTA and specific benefit."
+        });
+
+        // CTA suggestions
+        suggestions.push({
+            category: "Call-to-Action Buttons",
+            current: "(Review your current CTAs)",
+            suggestions: [
+                "See How It Works (2-min demo)",
+                "Get Your Free Security Assessment",
+                "Start Protecting Your Team Today",
+                "Calculate Your Risk Exposure →"
+            ],
+            why: "Specific CTAs outperform generic ones like 'Learn More' or 'Get Started'."
+        });
+
+        // Value prop suggestions
+        suggestions.push({
+            category: "Value Proposition Statement",
+            current: "(Add to your hero section)",
+            suggestions: [
+                "Web threats stopped at the source. Your productivity stays intact.",
+                "100% of web threats isolated. 0% impact on your team's workflow.",
+                "Enterprise security teams choose Replica Cyber because [specific differentiator]."
+            ],
+            why: "Lead with the outcome your customers want, not your product features."
+        });
+
+        // Social proof suggestions
+        suggestions.push({
+            category: "Social Proof / Trust Signals",
+            current: "(Add these elements to your page)",
+            suggestions: [
+                "Trusted by 500+ enterprise security teams worldwide",
+                '"Replica Cyber reduced our web-based incidents by 94%" - [Customer Name], CISO at [Company]',
+                "SOC 2 Type II Certified | FedRAMP Authorized | ISO 27001 Compliant",
+                "Featured in Gartner's Market Guide for Browser Isolation"
+            ],
+            why: "Social proof builds credibility with humans AND signals authority to AI systems."
+        });
+
+        // Render suggestions
+        container.innerHTML = suggestions.map(s => `
+            <div style="background: white; border: 1px solid var(--grey-light); border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                <h4 style="color: var(--olive-green-dark); margin-bottom: 10px;">${s.category}</h4>
+                <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; margin-bottom: 15px; font-size: 0.85rem;">
+                    <strong>Current:</strong> <span style="color: #666;">${s.current}</span>
+                </div>
+                <p style="font-size: 0.85rem; color: #888; margin-bottom: 10px;"><em>Why this matters:</em> ${s.why}</p>
+                <div style="margin-top: 10px;">
+                    <strong style="font-size: 0.85rem;">Suggested copy (click to copy):</strong>
+                    ${s.suggestions.map(suggestion => `
+                        <div class="copy-item" onclick="navigator.clipboard.writeText(this.innerText.trim()); this.style.background='#e8f5e9'; setTimeout(() => this.style.background='#f5f5f5', 1000);"
+                             style="background: #f5f5f5; padding: 12px; margin-top: 8px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; border-left: 3px solid var(--persimmon);">
+                            ${suggestion}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    extractCompanyName(title) {
+        if (!title) return 'Your Company';
+        // Try to extract company name from title
+        const parts = title.split(/[|\-–—]/);
+        return parts[0]?.trim() || 'Your Company';
+    }
+
+    exportReport() {
+        if (!this.currentResults) {
+            alert('No results to export');
+            return;
+        }
+
+        const results = this.currentResults;
+        const analysis = results.your_site_analysis || {};
+        const seo = analysis.seo_factors || {};
+        const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        // Build report content
+        let report = `WEBSITE OPTIMIZATION REPORT
+Generated: ${date}
+URL Analyzed: ${analysis.url || 'N/A'}
+
+${'='.repeat(60)}
+
+EXECUTIVE SUMMARY
+${'='.repeat(60)}
+
+This report analyzes your website for SEO, GEO (Generative Engine Optimization),
+and LLM discoverability factors. Below are prioritized recommendations to improve
+your visibility in both traditional search and AI-powered search engines.
+
+${'='.repeat(60)}
+
+TOP PRIORITY ACTIONS
+${'='.repeat(60)}
+
+`;
+
+        // Add priority actions
+        (results.priority_actions || []).forEach((action, i) => {
+            report += `
+${i + 1}. ${action.title}
+   Category: ${action.category} | Impact: ${action.impact} | Effort: ${action.effort}
+
+   ${action.description || ''}
+
+   Action Steps:
+${(action.all_actions || [action.first_step]).filter(Boolean).map(a => `   • ${a}`).join('\n')}
+
+`;
+        });
+
+        report += `
+${'='.repeat(60)}
+
+SITE ANALYSIS METRICS
+${'='.repeat(60)}
+
+SEO Factors:
+• Title: ${seo.title || 'Missing'}
+• Title Length: ${seo.title_length || 0} characters (optimal: 50-60)
+• Meta Description: ${seo.meta_description ? 'Present' : 'Missing'}
+• Meta Description Length: ${seo.meta_description_length || 0} characters (optimal: 150-160)
+• H1 Tags: ${seo.h1_tags?.length || 0} (optimal: 1)
+• Word Count: ${seo.word_count || 0}
+• Images Missing Alt Text: ${seo.images_without_alt || 0}
+
+Technical Factors:
+• HTTPS: ${analysis.technical_factors?.https ? 'Yes' : 'No'}
+• Sitemap: ${analysis.technical_factors?.has_sitemap ? 'Yes' : 'No'}
+• Robots.txt: ${analysis.technical_factors?.has_robots_txt ? 'Yes' : 'No'}
+
+LLM Discoverability:
+• Structured Content: ${analysis.llm_discoverability?.structured_content ? 'Yes' : 'No'}
+• FAQ Schema: ${analysis.llm_discoverability?.faq_schema ? 'Yes' : 'No'}
+
+GEO (AI Citation) Factors:
+• Statistics Present: ${analysis.geo_factors?.statistics_present ? 'Yes' : 'No'}
+• Citation Ready: ${analysis.geo_factors?.citation_ready ? 'Yes' : 'No'}
+• Lists/Bullets: ${analysis.geo_factors?.lists_and_bullets || 0}
+
+${'='.repeat(60)}
+
+ALL RECOMMENDATIONS
+${'='.repeat(60)}
+
+`;
+
+        // Add all recommendations
+        (results.recommendations || []).forEach((rec, i) => {
+            report += `
+${i + 1}. [${rec.category}] ${rec.title}
+   Impact: ${rec.impact} | Effort: ${rec.effort}
+
+   ${rec.description}
+
+   Action Steps:
+${(rec.specific_actions || []).map(a => `   • ${a}`).join('\n')}
+
+   Expected Outcome: ${rec.expected_outcome || 'Improved performance'}
+
+`;
+        });
+
+        report += `
+${'='.repeat(60)}
+
+ISSUES FOUND
+${'='.repeat(60)}
+
+`;
+        (analysis.issues || []).forEach(issue => {
+            report += `• [${issue.severity?.toUpperCase()}] ${issue.issue} (${issue.category})\n`;
+        });
+
+        report += `
+
+${'='.repeat(60)}
+
+STRENGTHS
+${'='.repeat(60)}
+
+`;
+        (analysis.strengths || []).forEach(strength => {
+            report += `• ${strength.strength} (${strength.category})\n`;
+        });
+
+        report += `
+
+${'='.repeat(60)}
+Report generated by Website Competitor Scanner
+${'='.repeat(60)}
+`;
+
+        // Download as text file
+        const blob = new Blob([report], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `website-optimization-report-${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     switchTab(tabId) {

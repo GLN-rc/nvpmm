@@ -164,11 +164,29 @@
             <!-- Results Section -->
             <section id="results-section">
                 <div class="card">
-                    <h2 style="margin-bottom: var(--spacing-lg);">Analysis Results</h2>
+                    <!-- Analysis Summary Banner -->
+                    <div id="analysis-summary" style="background: linear-gradient(135deg, var(--olive-green) 0%, var(--olive-green-dark) 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                            <div>
+                                <h2 style="margin: 0 0 5px 0; font-size: 1.3rem;">Analysis Results</h2>
+                                <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;" id="analyzed-url">Page analyzed: Loading...</p>
+                                <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 0.8rem;">Note: Currently analyzing homepage only. Deep site crawl coming soon.</p>
+                            </div>
+                            <button class="btn" id="export-btn" style="background: white; color: var(--olive-green-dark); padding: 10px 20px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Export Report
+                            </button>
+                        </div>
+                    </div>
 
                     <!-- Tabs -->
                     <div class="tabs">
                         <button class="tab active" data-tab="priority">Priority Actions</button>
+                        <button class="tab" data-tab="copy-suggestions">Copy Suggestions</button>
                         <button class="tab" data-tab="recommendations">All Recommendations</button>
                         <button class="tab" data-tab="your-site">Your Site Analysis</button>
                         <button class="tab" data-tab="competitors-tab">Competitor Comparison</button>
@@ -181,6 +199,17 @@
                             These are the highest-impact actions you should take first, ranked by potential impact and effort required.
                         </p>
                         <div class="priority-list" id="priority-list">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Copy Suggestions Tab -->
+                    <div class="tab-content" id="tab-copy-suggestions">
+                        <h3 style="margin-bottom: var(--spacing-md);">Ready-to-Use Copy</h3>
+                        <p style="color: var(--grey-medium); margin-bottom: var(--spacing-lg);">
+                            Drop-in copy suggestions based on your site analysis. Click to copy any suggestion.
+                        </p>
+                        <div id="copy-suggestions-list">
                             <!-- Populated by JavaScript -->
                         </div>
                     </div>
