@@ -39,6 +39,7 @@ class WebsiteScraper:
             "technical_factors": {},
             "llm_discoverability": {},
             "geo_factors": {},
+            "page_messaging": {},
             "issues": [],
             "strengths": []
         }
@@ -60,6 +61,7 @@ class WebsiteScraper:
                 result["technical_factors"] = await self._analyze_technical(session, url, soup, response)
                 result["llm_discoverability"] = self._analyze_llm_factors(soup, html)
                 result["geo_factors"] = self._analyze_geo_factors(soup)
+                result["page_messaging"] = self._analyze_page_messaging(soup)
 
                 # Compile issues and strengths
                 result["issues"], result["strengths"] = self._compile_findings(result)
@@ -354,6 +356,83 @@ class WebsiteScraper:
             geo["citation_ready"] = True
 
         return geo
+
+    def _analyze_page_messaging(self, soup: BeautifulSoup) -> dict:
+        """
+        Infer the page's core message, intended audience, and value proposition
+        from the visible text — hero copy, headings, CTAs, and body content.
+        """
+        messaging = {
+            "primary_message": "",
+            "apparent_audience": "",
+            "value_proposition": "",
+            "key_claims": [],
+            "cta_language": [],
+            "tone": ""
+        }
+
+        # Grab hero / above-the-fold text: H1, first H2, hero-class elements
+        h1_tags = [t.get_text(strip=True) for t in soup.find_all("h1")]
+        h2_tags = [t.get_text(strip=True) for t in soup.find_all("h2")][:4]
+
+        # Hero-like containers
+        hero_text = []
+        for cls in ["hero", "banner", "jumbotron", "headline", "intro", "above-fold"]:
+            el = soup.find(class_=re.compile(cls, re.I))
+            if el:
+                hero_text.append(el.get_text(separator=" ", strip=True)[:300])
+
+        # Primary message = H1 or first hero text
+        if h1_tags:
+            messaging["primary_message"] = h1_tags[0]
+        elif hero_text:
+            messaging["primary_message"] = hero_text[0][:150]
+
+        # Value prop — look for subheadline patterns near the hero
+        all_paras = [p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True)) > 40]
+        if all_paras:
+            messaging["value_proposition"] = all_paras[0][:200]
+
+        # Key claims from H2s
+        messaging["key_claims"] = h2_tags[:5]
+
+        # CTA language
+        for el in soup.find_all(["a", "button"]):
+            text = el.get_text(strip=True)
+            if 3 < len(text) < 60:
+                messaging["cta_language"].append(text)
+        messaging["cta_language"] = list(dict.fromkeys(messaging["cta_language"]))[:8]
+
+        # Audience signals: look for persona/role language
+        full_text = soup.get_text(separator=" ", strip=True)
+        audience_signals = []
+        audience_patterns = [
+            r"for\s+(enterprise|teams?|developers?|security|CTOs?|CISOs?|engineers?|marketers?|executives?|IT\s+\w+)",
+            r"built\s+for\s+([^,.]{5,40})",
+            r"designed\s+for\s+([^,.]{5,40})",
+            r"trusted\s+by\s+([^,.]{5,50})"
+        ]
+        for pat in audience_patterns:
+            matches = re.findall(pat, full_text, re.I)
+            audience_signals.extend(matches[:2])
+        if audience_signals:
+            messaging["apparent_audience"] = "; ".join(list(dict.fromkeys(audience_signals))[:3])
+
+        # Tone heuristic
+        word_count = len(full_text.split())
+        exclamations = full_text.count("!")
+        technical_terms = len(re.findall(
+            r"\b(API|SDK|integration|compliance|enterprise|zero.trust|encryption|schema|protocol)\b",
+            full_text, re.I
+        ))
+        if technical_terms > 5:
+            messaging["tone"] = "Technical / B2B"
+        elif exclamations > 3:
+            messaging["tone"] = "Energetic / Consumer"
+        else:
+            messaging["tone"] = "Professional / Corporate"
+
+        return messaging
 
     def _compile_findings(self, result: dict) -> tuple[list, list]:
         """Compile issues and strengths from analysis."""

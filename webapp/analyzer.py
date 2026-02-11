@@ -243,10 +243,18 @@ class OptimizationAnalyzer:
 URL: {your_site.get('url')}
 Domain: {your_site.get('domain')}
 
+### Page Messaging (what the page actually says)
+- Primary Message (H1/Hero): {your_site.get('page_messaging', {}).get('primary_message', 'Not found')}
+- Value Proposition: {your_site.get('page_messaging', {}).get('value_proposition', 'Not found')}
+- Apparent Audience: {your_site.get('page_messaging', {}).get('apparent_audience', 'Not stated')}
+- Page Tone: {your_site.get('page_messaging', {}).get('tone', 'Unknown')}
+- Key H2 Claims: {your_site.get('page_messaging', {}).get('key_claims', [])}
+- CTA Language Found: {your_site.get('page_messaging', {}).get('cta_language', [])}
+
 ### SEO Factors
 - Title: {your_site.get('seo_factors', {}).get('title', 'Not found')}
 - Title Length: {your_site.get('seo_factors', {}).get('title_length', 0)} chars
-- Meta Description: {your_site.get('seo_factors', {}).get('meta_description', 'Not found')[:100]}...
+- Meta Description: {your_site.get('seo_factors', {}).get('meta_description', 'Not found')[:150]}
 - H1 Tags: {your_site.get('seo_factors', {}).get('h1_tags', [])}
 - Word Count: {your_site.get('seo_factors', {}).get('word_count', 0)}
 - Images without alt: {your_site.get('seo_factors', {}).get('images_without_alt', 0)}
@@ -281,8 +289,11 @@ Domain: {your_site.get('domain')}
 ## Competitive Gaps Identified
 {json.dumps(gaps, indent=2)}
 
-## Brand Context
-{brand_context.get('all_brand_elements', {})}
+## Brand Context (from uploaded documents)
+Key Elements: {brand_context.get('all_brand_elements', {})}
+
+Document Content (first 3000 chars):
+{brand_context.get('combined_content', 'No documents uploaded')[:3000]}
 
 ## Focus Areas
 {focus_areas if focus_areas else 'General optimization'}
@@ -294,22 +305,30 @@ Based on this analysis, provide 8-12 specific, prioritized recommendations in th
   "recommendations": [
     {{
       "id": 1,
-      "category": "SEO|GEO|LLM|Technical|Content|Brand",
+      "category": "SEO|AI Discoverability|Technical|Messaging|Competitive",
       "title": "Brief title of recommendation",
-      "description": "Detailed description of what to do and why",
+      "description": "Detailed description of what to do and why — be specific to THIS site, not generic",
       "impact": "high|medium|low",
       "effort": "low|medium|high",
       "specific_actions": ["Action 1", "Action 2"],
-      "expected_outcome": "What improvement to expect"
+      "expected_outcome": "What specific improvement to expect"
     }}
   ]
 }}
 
+IMPORTANT RULES:
+- GEO and LLM are the same goal (AI discoverability). Use category "AI Discoverability" for both.
+- Do NOT generate duplicate recommendations. If FAQ schema appears once, do not add it again.
+- Make descriptions specific to this site's actual content, title, and issues — not generic advice.
+- If brand documents are provided, use them to make copy and messaging recommendations specific to their actual positioning.
+- Technical issues (missing sitemap, robots.txt, HTTPS) must appear as a "Technical" category card with plain-language explanations.
+- Competitive gap recommendations must explain in plain language WHY the gap matters and WHAT to do specifically.
+
 Prioritize recommendations that:
 1. Address high-severity issues first
 2. Close competitive gaps
-3. Improve LLM/AI search discoverability
-4. Align with the brand positioning
+3. Improve AI/LLM search discoverability
+4. Align with the brand positioning from uploaded documents
 5. Have high impact with reasonable effort"""
 
         return prompt
@@ -360,77 +379,138 @@ Prioritize recommendations that:
                 })
                 rec_id += 1
 
-        # Add GEO-specific recommendations
-        if not geo.get("citation_ready") and rec_id <= 12:
-            geo_practice = GEO_BEST_PRACTICES.get("citation_optimization", {})
+        # AI Discoverability (GEO + LLM combined — they are the same goal)
+        # Combine into one card if multiple signals are missing, to avoid duplicate cards
+        ai_issues = []
+        ai_actions = []
+
+        if not geo.get("citation_ready"):
+            ai_issues.append("content is not optimized to be cited by AI systems")
+            ai_actions += [
+                "Add specific statistics and data points with cited sources (e.g. '94% of web-based attacks are prevented')",
+                "Include expert quotes or authoritative references with attribution",
+                "Use bulleted lists for key claims — AI systems extract these easily",
+            ]
+
+        if not geo.get("statistics_present"):
+            ai_issues.append("no specific numbers or statistics found")
+            ai_actions += [
+                "Replace vague claims ('significantly reduces risk') with specific numbers ('reduces incidents by 94%')",
+                "Add deployment stats, customer counts, or benchmark data",
+                "Update statistics at least annually and cite sources",
+            ]
+
+        if not llm.get("faq_schema"):
+            ai_issues.append("no FAQ schema markup")
+            ai_actions += [
+                "Create a FAQ section answering the top 5 questions buyers ask",
+                "Implement FAQPage JSON-LD schema markup on the page",
+                "Write questions exactly as buyers would phrase them to AI assistants",
+            ]
+
+        if not llm.get("structured_content"):
+            ai_issues.append("content lacks clear heading hierarchy")
+            ai_actions += [
+                "Ensure each major topic has its own H2 heading",
+                "Start each section with a summary sentence that works standalone",
+                "Use H3s for subtopics under each H2",
+            ]
+
+        if ai_issues and rec_id <= 12:
+            # Deduplicate actions
+            seen_actions = set()
+            unique_ai_actions = []
+            for a in ai_actions:
+                if a not in seen_actions:
+                    seen_actions.add(a)
+                    unique_ai_actions.append(a)
+
             recommendations.append({
                 "id": rec_id,
-                "category": "GEO",
-                "title": geo_practice.get("title", "Optimize for AI citations"),
-                "description": geo_practice.get("description", "Structure content for AI citation"),
+                "category": "AI Discoverability",
+                "title": "Optimize for AI Search & Generative Engines",
+                "description": (
+                    "AI tools like ChatGPT, Perplexity, and Gemini are increasingly where buyers start their research. "
+                    "To appear in AI-generated answers, your content needs to be structured, data-rich, and explicitly answerable. "
+                    f"Issues found: {'; '.join(ai_issues)}."
+                ),
                 "impact": "high",
                 "effort": "medium",
-                "specific_actions": geo_practice.get("actions", [
-                    "Add relevant statistics and data points",
-                    "Include expert quotes with attribution",
-                    "Use bulleted lists for key points"
-                ]),
-                "expected_outcome": "Higher likelihood of being cited in AI search results"
+                "specific_actions": unique_ai_actions[:8],
+                "expected_outcome": (
+                    "Higher likelihood of being cited in AI search results (ChatGPT, Perplexity, Gemini). "
+                    "FAQ schema can also trigger Google 'People Also Ask' rich results, increasing organic click-through."
+                )
             })
             rec_id += 1
 
-        if not geo.get("statistics_present") and rec_id <= 12:
-            geo_practice = GEO_BEST_PRACTICES.get("statistics_data", {})
-            recommendations.append({
-                "id": rec_id,
-                "category": "GEO",
-                "title": geo_practice.get("title", "Include Statistics and Data"),
-                "description": geo_practice.get("description", "Add quantifiable data points"),
-                "impact": "high",
-                "effort": "medium",
-                "specific_actions": geo_practice.get("actions", [
-                    "Include relevant statistics with sources",
-                    "Use specific numbers rather than vague terms",
-                    "Update statistics regularly"
-                ]),
-                "expected_outcome": "Enhanced credibility and AI citation potential"
-            })
-            rec_id += 1
+        # Technical recommendations — explicitly check for missing technical factors
+        tech_issues = []
+        tech_actions = []
 
-        # Add LLM-specific recommendations
-        if not llm.get("faq_schema") and rec_id <= 12:
-            llm_practice = LLM_BEST_PRACTICES.get("faq_schema", {})
+        if not tech.get("has_sitemap"):
+            tech_issues.append("no sitemap.xml found")
+            tech_actions += [
+                "Create a sitemap.xml file listing all indexable pages",
+                "Submit the sitemap to Google Search Console and Bing Webmaster Tools",
+                "Include lastmod dates to signal freshness to crawlers",
+            ]
+
+        if not tech.get("has_robots_txt"):
+            tech_issues.append("no robots.txt found")
+            tech_actions += [
+                "Create a robots.txt file at the domain root",
+                "Reference your sitemap URL inside robots.txt",
+                "Ensure robots.txt doesn't accidentally block important pages",
+            ]
+
+        if not tech.get("https"):
+            tech_issues.append("not using HTTPS")
+            tech_actions += [
+                "Install an SSL certificate (free via Let's Encrypt)",
+                "Set up 301 redirects from HTTP to HTTPS",
+                "Update all internal links to use HTTPS URLs",
+            ]
+
+        if not tech.get("mobile_friendly_hints"):
+            tech_issues.append("no viewport meta tag detected (likely not mobile-optimized)")
+            tech_actions += [
+                "Add <meta name='viewport' content='width=device-width, initial-scale=1'> to the page <head>",
+                "Test mobile layout using Google's Mobile-Friendly Test",
+                "Ensure touch targets (buttons, links) are at least 44px tall",
+            ]
+
+        # Security headers
+        for issue in issues:
+            if issue.get("category") == "Technical" and issue.get("severity") in ("high", "medium"):
+                if issue.get("issue") not in [ti for ti in tech_issues]:
+                    tech_issues.append(issue.get("issue", ""))
+                    tech_actions.append(f"Resolve: {issue.get('issue', '')}")
+
+        if tech_issues and rec_id <= 14:
+            seen_tech = set()
+            unique_tech_actions = []
+            for a in tech_actions:
+                if a not in seen_tech:
+                    seen_tech.add(a)
+                    unique_tech_actions.append(a)
+
             recommendations.append({
                 "id": rec_id,
-                "category": "LLM",
-                "title": llm_practice.get("title", "Implement FAQ Schema"),
-                "description": llm_practice.get("description", "Add FAQ structured data"),
+                "category": "Technical",
+                "title": "Fix Technical SEO Foundations",
+                "description": (
+                    "Technical issues don't affect design, but they directly impact how well search engines "
+                    "and AI crawlers can discover, index, and trust your site. "
+                    f"Issues found: {'; '.join(i for i in tech_issues if i)}."
+                ),
                 "impact": "high",
                 "effort": "low",
-                "specific_actions": llm_practice.get("actions", [
-                    "Create dedicated FAQ section",
-                    "Implement FAQPage schema markup",
-                    "Write questions as users would ask them"
-                ]),
-                "expected_outcome": "Enhanced visibility in AI search and voice assistants"
-            })
-            rec_id += 1
-
-        if not llm.get("structured_content") and rec_id <= 12:
-            llm_practice = LLM_BEST_PRACTICES.get("structured_content", {})
-            recommendations.append({
-                "id": rec_id,
-                "category": "LLM",
-                "title": llm_practice.get("title", "Structure Content for LLM Parsing"),
-                "description": llm_practice.get("description", "Organize content for AI understanding"),
-                "impact": "high",
-                "effort": "low",
-                "specific_actions": llm_practice.get("actions", [
-                    "Use clear heading hierarchy",
-                    "Start sections with summary statements",
-                    "Use bullet points for features/benefits"
-                ]),
-                "expected_outcome": "Better content extraction by AI systems"
+                "specific_actions": unique_tech_actions[:8],
+                "expected_outcome": (
+                    "Improved crawlability and indexing. Search engines can fully discover your site, "
+                    "and HTTPS + security headers increase trust signals for both users and ranking algorithms."
+                )
             })
             rec_id += 1
 
@@ -526,18 +606,92 @@ Prioritize recommendations that:
             })
             rec_id += 1
 
-        # Address competitive gaps
+        # Address competitive gaps — with plain-language descriptions
+        gap_explanations = {
+            "content_depth": {
+                "title": "Expand Content Depth to Match Competitors",
+                "what": (
+                    "One or more competitors have significantly more content on their homepage/landing page. "
+                    "Search engines and AI systems interpret more comprehensive content as a signal of expertise and authority."
+                ),
+                "actions": [
+                    "Identify the specific topics competitors cover that you don't",
+                    "Add sections addressing buyer questions: How it works, Use cases, Who it's for, Pricing overview",
+                    "Expand existing sections with more detail rather than adding filler",
+                    "Aim for 800–1,500 words on key landing pages",
+                ],
+                "outcome": "Better ranking for competitive keywords; more content for AI systems to cite when recommending your solution."
+            },
+            "structured_data": {
+                "title": "Add Structured Data (Schema Markup) Like Competitors",
+                "what": (
+                    "One or more competitors use schema.org structured data markup on their pages. "
+                    "This is code you add to your page (invisible to visitors) that tells search engines exactly what your page is about — "
+                    "your organization, product, pricing, FAQ, etc. It enables rich results (star ratings, FAQ dropdowns) in Google "
+                    "and makes your page more citable by AI systems."
+                ),
+                "actions": [
+                    "Add Organization schema: your company name, description, logo, social links",
+                    "Add Product or SoftwareApplication schema with your key features and pricing info",
+                    "Add FAQPage schema for your FAQ section",
+                    "Validate implementation with Google's Rich Results Test",
+                ],
+                "outcome": "Eligibility for rich results in Google search (higher click-through rates), and better AI discoverability."
+            },
+            "geo_statistics": {
+                "title": "Add Statistics & Data Points (Competitors Already Have These)",
+                "what": (
+                    "Competitors include specific numbers and statistics on their pages. "
+                    "AI systems like ChatGPT and Perplexity strongly prefer citing sources with concrete data. "
+                    "Pages with statistics are viewed as more credible by both humans and AI."
+                ),
+                "actions": [
+                    "Add specific performance metrics: reduction in threats, deployment time, customer count",
+                    "Include industry statistics with cited sources to build authority",
+                    "Replace vague language ('significant reduction') with numbers ('94% fewer incidents')",
+                    "Add a data/results section to your page",
+                ],
+                "outcome": "Higher AI citation rate; builds credibility with buyers; content seen as more authoritative."
+            },
+            "comparison_content": {
+                "title": "Add Comparison Tables to Win 'Best X' and 'X vs Y' Searches",
+                "what": (
+                    "Competitors have comparison tables on their pages. "
+                    "Comparison tables are highly effective for winning featured snippets in Google for 'best [product]' and 'X vs Y' queries. "
+                    "AI systems also extract table data directly when answering comparison questions."
+                ),
+                "actions": [
+                    "Create a features comparison table: your product vs. category alternatives",
+                    "Add a 'Why choose us vs. [competitor category]' table",
+                    "Include use-case rows: which scenarios each option is best for",
+                    "Ensure the table is HTML (not an image) so it's machine-readable",
+                ],
+                "outcome": "Better visibility for comparison searches; increased chance of AI recommendations when buyers ask 'what's the best [category]?'"
+            }
+        }
+
+        seen_gap_types = set()
         for gap in gaps[:3]:
-            if rec_id <= 18:
+            gap_type = gap.get("type", "")
+            competitor = gap.get("competitor", "a competitor")
+            if rec_id <= 18 and gap_type not in seen_gap_types:
+                seen_gap_types.add(gap_type)
+                exp = gap_explanations.get(gap_type, {})
                 recommendations.append({
                     "id": rec_id,
                     "category": "Competitive",
-                    "title": f"Close gap: {gap.get('type', '').replace('_', ' ').title()}",
-                    "description": gap.get("detail", ""),
+                    "title": exp.get("title", f"Close Competitive Gap: {gap_type.replace('_', ' ').title()}"),
+                    "description": (
+                        f"{exp.get('what', gap.get('detail', ''))} "
+                        f"(Detected vs. {competitor}.)"
+                    ),
                     "impact": gap.get("impact", "medium"),
                     "effort": "medium",
-                    "specific_actions": [f"Implement {gap.get('type', '')} improvements"],
-                    "expected_outcome": "Match or exceed competitor capabilities"
+                    "specific_actions": exp.get("actions", [gap.get("detail", "")]),
+                    "expected_outcome": exp.get(
+                        "outcome",
+                        f"Close the gap with {competitor} and match their capabilities in this area."
+                    )
                 })
                 rec_id += 1
 
@@ -581,7 +735,7 @@ Prioritize recommendations that:
                 score += 5
 
             # Category bonuses
-            if rec.get("category") in ["GEO", "LLM", "Messaging"]:
+            if rec.get("category") in ["GEO", "LLM", "AI Discoverability", "Messaging"]:
                 score += 10  # Prioritize AI and messaging optimizations
 
             scored.append((score, rec))
