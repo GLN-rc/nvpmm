@@ -84,10 +84,6 @@ class BlogPdfApp {
             this.extraPageBanner.classList.add('hidden');
         });
 
-        // Tabs
-        document.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
-        });
     }
 
     // ── File handling ──────────────────────────────────────────────────────
@@ -254,10 +250,6 @@ class BlogPdfApp {
         const ctaLine = [ex.cta_text, ex.cta_url].filter(Boolean).join('  ');
         this.setText('prev-elev-cta', ctaLine || '');
 
-        // Images tab
-        this.renderImageSuggestions(ex.image_suggestions || [], ex);
-
-        this.switchTab('preview');
     }
 
     renderImageSuggestions(suggestions, extracted) {

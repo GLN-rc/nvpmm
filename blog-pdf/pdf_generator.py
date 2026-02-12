@@ -99,7 +99,8 @@ HEADER_H      = 2.0 * inch
 FOOTER_H      = 0.5 * inch       # full-bleed navy footer band height
 BODY_FONT_SZ  = 11.0
 BODY_LEADING  = 16.5
-CTA_BLOCK_H   = 2.6 * inch       # tall enough for full elevator pitch boilerplate
+CTA_BLOCK_H_MIN = 1.1 * inch     # minimum CTA block height (CTA link + padding)
+CTA_BLOCK_H_MAX = 3.5 * inch     # maximum — never taller than this
 
 # ── Text utilities ─────────────────────────────────────────────────────────────
 
@@ -376,42 +377,70 @@ def _draw_footer(c, logo_path=None):
 
 # ── CTA block ─────────────────────────────────────────────────────────────────
 
-def _draw_cta_block(c, elev_hdr, elev_body, cta_text, cta_url):
-    """CTA / elevator pitch block anchored just above the footer band."""
+def _calc_cta_block_h(elev_body: str) -> float:
+    """
+    Calculate the CTA block height needed to fit the elevator pitch body.
+    Returns height in points, clamped between CTA_BLOCK_H_MIN and CTA_BLOCK_H_MAX.
+    """
+    body = elev_body or ""
+    body_w = CONTENT_W - 0.4 * inch
+    top_pad    = 0.28 * inch
+    bot_pad    = 0.52 * inch   # room for CTA link + breathing space below it
+    body_sz    = 10.0
+    body_lead  = 14.5
+
+    if not body:
+        return CTA_BLOCK_H_MIN
+
+    # Find the font size + line count that fits within MAX
+    for try_sz in [10.0, 9.5, 9.0, 8.5, 8.0, 7.5]:
+        max_chars = max(10, int(body_w / (try_sz * 0.52)))
+        n_lines   = len(_wrap(body, max_chars))
+        body_sz   = try_sz
+        body_lead = try_sz * 1.45
+        natural_h = top_pad + body_lead * n_lines + bot_pad
+        if natural_h <= CTA_BLOCK_H_MAX:
+            break
+
+    natural_h = top_pad + body_lead * len(_wrap(body, max(10, int(body_w / (body_sz * 0.52))))) + bot_pad
+    return max(CTA_BLOCK_H_MIN, min(natural_h, CTA_BLOCK_H_MAX))
+
+
+def _draw_cta_block(c, elev_hdr, elev_body, cta_text, cta_url, block_h: float):
+    """CTA / elevator pitch block anchored just above the footer band.
+    block_h must be pre-calculated by _calc_cta_block_h() so the rest of the
+    page layout can reserve space correctly before this is drawn."""
     block_y = FOOTER_H + 0.18 * inch   # sits just above footer band
     bx = MARGIN
 
     c.setFillColor(NAVY)
-    c.rect(bx, block_y, CONTENT_W, CTA_BLOCK_H, stroke=0, fill=1)
+    c.rect(bx, block_y, CONTENT_W, block_h, stroke=0, fill=1)
 
     # Pink left accent
     c.setFillColor(PINK)
-    c.rect(bx, block_y, 4, CTA_BLOCK_H, stroke=0, fill=1)
+    c.rect(bx, block_y, 4, block_h, stroke=0, fill=1)
 
     ix = bx + 0.2 * inch
 
-    # No header label — jump straight into the elevator pitch copy
-    body = elev_body or "Replica delivers isolated, policy-controlled workspaces that eliminate endpoint risk without slowing your team down."
+    body   = elev_body or "Replica delivers isolated, policy-controlled workspaces that eliminate endpoint risk without slowing your team down."
     body_w = CONTENT_W - 0.4 * inch
 
-    # Auto-shrink font size to fit elevator pitch body — allow up to 9 lines
-    MAX_BODY_LINES = 9
+    # Pick font size that fits the actual block height
     body_sz   = 10.0
     body_lead = 14.5
     for try_sz in [10.0, 9.5, 9.0, 8.5, 8.0, 7.5]:
         max_chars = max(10, int(body_w / (try_sz * 0.52)))
-        n_lines = len(_wrap(body, max_chars))
+        n_lines   = len(_wrap(body, max_chars))
         body_sz   = try_sz
         body_lead = try_sz * 1.45
-        if n_lines <= MAX_BODY_LINES:
-            break
+        if block_y + block_h - 0.28 * inch - body_lead * n_lines > block_y + 0.45 * inch:
+            break   # text fits above the CTA link row
 
-    # Body starts near the top of the block (no header above it)
-    _draw_text_block(c, ix, block_y + CTA_BLOCK_H - 0.28 * inch,
+    _draw_text_block(c, ix, block_y + block_h - 0.28 * inch,
                      body_w, body,
-                     _font("OpenSans"), body_sz, body_lead, WHITE, max_lines=MAX_BODY_LINES)
+                     _font("OpenSans"), body_sz, body_lead, WHITE)
 
-    # CTA link — show label text; if URL provided, make it a hyperlink
+    # CTA link — cyan, bottom of block
     cta_display = cta_text.strip() if cta_text else ""
     if not cta_display and cta_url:
         cta_display = cta_url[:80]
@@ -420,7 +449,7 @@ def _draw_cta_block(c, elev_hdr, elev_body, cta_text, cta_url):
         c.setFillColor(CYAN)
         c.drawString(ix, block_y + 0.22 * inch, cta_display[:100])
         if cta_url:
-            link_w = len(cta_display) * 9.5 * 0.55   # rough pixel width
+            link_w = len(cta_display) * 9.5 * 0.55
             c.linkURL(cta_url,
                       (ix, block_y + 0.12 * inch, ix + link_w, block_y + 0.34 * inch),
                       relative=0)
@@ -528,9 +557,16 @@ def generate_pdf(data: dict, image_paths: Optional[dict] = None) -> bytes:
     _render_narrow_band(c)
     y = H - 0.45 * inch - 0.4 * inch
 
-    # bottom_p2: content must stay above the CTA block + separator
-    # No extra reservation for read-more link — it now floats just below content
-    bottom_p2 = FOOTER_H + 0.18 * inch + CTA_BLOCK_H + 0.18 * inch
+    # Calculate CTA block height from actual text BEFORE laying out page 2,
+    # so all bottom boundaries are derived from real content height.
+    cta_block_h = _calc_cta_block_h(elev_body)
+    cta_gap     = 0.18 * inch   # gap between footer band top and CTA block bottom
+    sep_gap     = 0.25 * inch   # gap between CTA block top and separator line
+    read_gap    = 0.22 * inch   # min gap between separator and read-more link
+
+    # bottom_p2: sections must not go below this line
+    sep_y     = FOOTER_H + cta_gap + cta_block_h + sep_gap
+    bottom_p2 = sep_y + read_gap + 14   # 14pt = one line height for read-more link
 
     for idx, section in enumerate(sections):
         hdr  = section.get("header", "")
@@ -570,15 +606,9 @@ def generate_pdf(data: dict, image_paths: Optional[dict] = None) -> bytes:
                                  max_lines=ml)
         y -= 0.3 * inch
 
-    # "Read the full article" link — follows immediately below last section content
-    sep_y = FOOTER_H + 0.18 * inch + CTA_BLOCK_H + 0.25 * inch
+    # "Read the full article" link — sits just above the separator
     if blog_url:
-        # Float the link just below the last section (y = current position after loop)
-        read_y = y - 0.18 * inch
-        # Safety clamp: never let it overlap or go below the separator
-        min_read_y = sep_y + 0.22 * inch
-        if read_y < min_read_y:
-            read_y = min_read_y
+        read_y = sep_y - read_gap
         c.setFont(_font("OpenSans-Bold"), 9)
         c.setFillColor(CYAN)
         label = "Read the full article \u2192"
@@ -587,12 +617,12 @@ def generate_pdf(data: dict, image_paths: Optional[dict] = None) -> bytes:
                   (MARGIN, read_y - 3, MARGIN + CONTENT_W, read_y + 11),
                   relative=0)
 
-    # Thin separator line above CTA block (always at fixed position from bottom)
+    # Thin separator line — fixed distance above CTA block
     c.setStrokeColor(HexColor("#DDE1EC"))
     c.setLineWidth(0.75)
     c.line(MARGIN, sep_y, W - MARGIN, sep_y)
 
-    _draw_cta_block(c, elev_hdr, elev_body, cta_text, cta_url)
+    _draw_cta_block(c, elev_hdr, elev_body, cta_text, cta_url, cta_block_h)
     _draw_footer(c, logo_path)
 
     c.save()

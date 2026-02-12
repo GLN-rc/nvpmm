@@ -87,25 +87,21 @@ async def generate(
 
     # ── 2. Extract brand docs text (combine all uploaded docs) ────────────────
     brand_doc_text = ""
+    brand_doc_paths = []   # keep (tmp_path, filename) alive for verbatim extraction
     valid_docs = [d for d in brand_docs if d and d.filename]
     for brand_doc in valid_docs:
         tmp = tempfile.NamedTemporaryFile(
             suffix=os.path.splitext(brand_doc.filename)[1],
             delete=False
         )
-        try:
-            content = await brand_doc.read()
-            tmp.write(content)
-            tmp.flush()
-            tmp.close()
-            doc_text = _extract_doc_text(tmp.name, brand_doc.filename)
-            if doc_text:
-                brand_doc_text += f"\n\n--- {brand_doc.filename} ---\n{doc_text}"
-        finally:
-            try:
-                os.unlink(tmp.name)
-            except Exception:
-                pass
+        content = await brand_doc.read()
+        tmp.write(content)
+        tmp.flush()
+        tmp.close()
+        brand_doc_paths.append((tmp.name, brand_doc.filename))
+        doc_text = _extract_doc_text(tmp.name, brand_doc.filename)
+        if doc_text:
+            brand_doc_text += f"\n\n--- {brand_doc.filename} ---\n{doc_text}"
 
     # ── 3. LLM extraction ─────────────────────────────────────────────────────
     pages = int(page_preference) if page_preference in ("2", "3") else 2
@@ -119,12 +115,30 @@ async def generate(
             inline_images=inline_images
         )
     except Exception as e:
+        # Clean up temp files before raising
+        for tmp_path, _ in brand_doc_paths:
+            try: os.unlink(tmp_path)
+            except Exception: pass
         raise HTTPException(status_code=500, detail=f"AI extraction failed: {str(e)}")
 
     # ── 4. Override elevator pitch + CTA with verbatim brand doc content ─────
-    # The LLM tends to paraphrase. If we can find the elevator pitch and CTA
-    # directly in the brand doc text, inject them verbatim.
-    verbatim = _extract_brand_verbatim(brand_doc_text)
+    # Try DOCX-native extraction first (uses paragraph styles for clean boundaries),
+    # then fall back to flat-text regex for PDFs / TXT files.
+    verbatim = {}
+    for tmp_path, orig_filename in brand_doc_paths:
+        ext = os.path.splitext(orig_filename.lower())[1]
+        if ext in {".docx", ".doc"}:
+            verbatim = _extract_brand_verbatim_docx(tmp_path) or {}
+        if verbatim.get("elevator_pitch_body"):
+            break   # found it — stop looking
+    if not verbatim.get("elevator_pitch_body"):
+        verbatim = _extract_brand_verbatim(brand_doc_text)
+
+    # Clean up temp files now that we're done with them
+    for tmp_path, _ in brand_doc_paths:
+        try: os.unlink(tmp_path)
+        except Exception: pass
+
     if verbatim.get("elevator_pitch_body"):
         extracted["elevator_pitch_body"] = verbatim["elevator_pitch_body"]
     if verbatim.get("elevator_pitch_header"):
@@ -220,6 +234,84 @@ async def regenerate_with_image(
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _extract_brand_verbatim_docx(file_path: str) -> dict:
+    """
+    Extract elevator pitch and CTA from a DOCX file using paragraph styles.
+    Looks for a heading whose text matches 'Boilerplate', 'Elevator pitch', etc.,
+    then collects all following Normal/body paragraphs until the next Heading.
+    This is far more reliable than regex on flattened text because it uses the
+    document's own structure to define section boundaries.
+    """
+    result = {}
+    try:
+        import docx as docx_lib
+        doc = docx_lib.Document(file_path)
+    except Exception:
+        return result
+
+    heading_styles = {"heading 1", "heading 2", "heading 3", "heading 4"}
+    pitch_labels = {
+        "boilerplate", "elevator pitch", "short pitch", "about replica",
+        "why replica", "our pitch", "one-liner", "value proposition",
+        "company description", "positioning statement"
+    }
+    url_pattern = re.compile(r"https?://[^\s\)\]\"'<>]+")
+    cta_labels = re.compile(
+        r"^(cta|call[- ]to[- ]action|request\s+a\s+demo|book\s+a\s+demo|get\s+started)",
+        re.IGNORECASE
+    )
+
+    paragraphs = doc.paragraphs
+    i = 0
+    while i < len(paragraphs):
+        p = paragraphs[i]
+        style_name = p.style.name.lower()
+        text = p.text.strip()
+
+        # Check if this is a heading that matches a pitch label
+        if style_name in heading_styles and text.lower() in pitch_labels:
+            # Collect all following paragraphs until the next heading
+            body_parts = []
+            i += 1
+            while i < len(paragraphs):
+                np = paragraphs[i]
+                np_style = np.style.name.lower()
+                np_text = np.text.strip()
+                # Stop at any heading
+                if np_style in heading_styles:
+                    break
+                if np_text:
+                    body_parts.append(np_text)
+                i += 1
+            if body_parts:
+                result["elevator_pitch_body"] = " ".join(body_parts).strip()
+            break
+        i += 1
+
+    # CTA: scan entire doc for a URL near demo/contact language
+    for p in paragraphs:
+        text = p.text.strip()
+        if not text:
+            continue
+        url_m = url_pattern.search(text)
+        if url_m:
+            url = url_m.group(0).rstrip(".,;)")
+            if re.search(r"(demo|contact|get[-_]started|book|schedule|request)", url, re.I):
+                if not result.get("cta_url"):
+                    result["cta_url"] = url
+                    # Text before the URL on the same line is the CTA label
+                    label = text[:url_m.start()].strip(" -:")
+                    if label and not result.get("cta_text"):
+                        result["cta_text"] = label
+        # Also check for explicit CTA label lines without URLs
+        if cta_labels.match(text) and not result.get("cta_text"):
+            remainder = re.sub(r"^[^:]+:\s*", "", text).strip()
+            if remainder and not url_pattern.search(remainder):
+                result["cta_text"] = remainder[:80]
+
+    return result
+
+
 def _extract_brand_verbatim(brand_doc_text: str) -> dict:
     """
     Extract elevator pitch and CTA from brand doc text verbatim (no LLM).
@@ -275,7 +367,7 @@ def _extract_brand_verbatim(brand_doc_text: str) -> dict:
                 break
             body_lines.append(stripped)
         if body_lines:
-            result["elevator_pitch_body"] = " ".join(body_lines)
+            result["elevator_pitch_body"] = " ".join(body_lines).strip()
 
     # ── CTA text + URL ─────────────────────────────────────────────────────────
     # Look for CTA labels like "CTA:", "Call to action:", "Button:", "Link:"

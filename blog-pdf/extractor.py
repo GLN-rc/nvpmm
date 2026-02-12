@@ -73,7 +73,7 @@ Return ONLY valid JSON matching this exact schema. No markdown, no explanation, 
       "body": "Substantive 4-6 sentence paragraph expanding on this angle. Include specific details, context, or implications from the blog. Aim for 100-120 words. No filler - every sentence must add information."
     }}
   ],
-  "elevator_pitch_body": "Copy the elevator pitch or boilerplate WORD FOR WORD from the brand doc. Do NOT paraphrase, summarize, or rewrite. If not found in the brand doc, use empty string.",
+  "elevator_pitch_body": "Copy the elevator pitch or boilerplate WORD FOR WORD from the brand doc - maximum 3 sentences only. Do NOT paraphrase, summarize, or rewrite. If not found in the brand doc, use empty string.",
   "cta_text": "CTA button/link text extracted from brand doc (e.g. 'Watch the demo'). If not found, use empty string.",
   "cta_url": "CTA URL from brand doc. If not found, use empty string.",
   "needs_extra_page": false,
