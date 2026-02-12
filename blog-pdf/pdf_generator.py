@@ -568,8 +568,8 @@ def generate_pdf(data: dict, image_paths: Optional[dict] = None) -> bytes:
     # Fixed anchors from bottom of page up
     cta_base  = FOOTER_H + cta_gap                   # bottom edge of CTA block
     sep_fixed = cta_base + cta_block_h + sep_gap     # separator line position
-    # Sections must leave room above separator for the read-more link
-    bottom_p2 = sep_fixed + sep_gap + read_link_h + read_gap
+    # Sections run to just above the separator — read-more link floats below them
+    bottom_p2 = sep_fixed + read_link_h + read_gap
 
     for idx, section in enumerate(sections):
         hdr  = section.get("header", "")

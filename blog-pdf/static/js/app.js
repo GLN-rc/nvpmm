@@ -208,11 +208,13 @@ class BlogPdfApp {
         this.currentFilename  = data.filename;
         this.currentExtracted = data.extracted;
 
+        this.inputSection.classList.add('hidden');
         this.hideLoading();
         this.resultsSection.classList.remove('hidden');
         // Make preview card visible (no tabs anymore)
         const previewTab = document.getElementById('tab-preview');
         if (previewTab) previewTab.classList.add('active');
+        window.scrollTo(0, 0);
 
         const ex = data.extracted || {};
 
