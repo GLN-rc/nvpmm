@@ -235,15 +235,22 @@ class BlogPdfApp {
         ).join('');
 
         const sectionsEl = document.getElementById('prev-sections');
-        sectionsEl.innerHTML = (ex.sections || []).map((s, i) => `
+        sectionsEl.innerHTML = (ex.sections || []).map((s, i) => {
+            const fullBody = s.body || '';
+            // Truncate to ~120 chars for preview
+            const preview = fullBody.length > 120 ? fullBody.slice(0, 120).trimEnd() + '…' : fullBody;
+            return `
             <div class="section-preview">
                 <h4>${this.esc(s.header || `Section ${i + 1}`)}</h4>
-                <p>${this.esc(s.body || '')}</p>
-            </div>
-        `).join('');
+                <p>${this.esc(preview)}</p>
+            </div>`;
+        }).join('');
 
         this.setText('prev-elev-header', ex.elevator_pitch_header || '');
-        this.setText('prev-elev-body', ex.elevator_pitch_body || '(No elevator pitch found in brand doc)');
+        // Show first 3 sentences of elevator pitch in preview (full version goes in PDF)
+        const elevBody = ex.elevator_pitch_body || '(No elevator pitch found in brand doc)';
+        const elevPreview = elevBody.match(/[^.!?]+[.!?]+/g)?.slice(0, 3).join(' ') || elevBody.slice(0, 300);
+        this.setText('prev-elev-body', elevPreview + (elevBody.length > elevPreview.length ? ' …' : ''));
         const ctaLine = [ex.cta_text, ex.cta_url].filter(Boolean).join('  ');
         this.setText('prev-elev-cta', ctaLine || '');
 

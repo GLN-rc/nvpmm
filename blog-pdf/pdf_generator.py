@@ -99,7 +99,7 @@ HEADER_H      = 2.0 * inch
 FOOTER_H      = 0.5 * inch       # full-bleed navy footer band height
 BODY_FONT_SZ  = 11.0
 BODY_LEADING  = 16.5
-CTA_BLOCK_H   = 1.85 * inch      # tall enough for 5 lines of elevator pitch
+CTA_BLOCK_H   = 2.6 * inch       # tall enough for full elevator pitch boilerplate
 
 # ── Text utilities ─────────────────────────────────────────────────────────────
 
@@ -394,11 +394,11 @@ def _draw_cta_block(c, elev_hdr, elev_body, cta_text, cta_url):
     body = elev_body or "Replica delivers isolated, policy-controlled workspaces that eliminate endpoint risk without slowing your team down."
     body_w = CONTENT_W - 0.4 * inch
 
-    # Auto-shrink font size to fit elevator pitch body in MAX_BODY_LINES lines
-    MAX_BODY_LINES = 5
+    # Auto-shrink font size to fit elevator pitch body — allow up to 9 lines
+    MAX_BODY_LINES = 9
     body_sz   = 10.0
     body_lead = 14.5
-    for try_sz in [10.0, 9.5, 9.0, 8.5, 8.0]:
+    for try_sz in [10.0, 9.5, 9.0, 8.5, 8.0, 7.5]:
         max_chars = max(10, int(body_w / (try_sz * 0.52)))
         n_lines = len(_wrap(body, max_chars))
         body_sz   = try_sz
@@ -407,7 +407,7 @@ def _draw_cta_block(c, elev_hdr, elev_body, cta_text, cta_url):
             break
 
     # Body starts near the top of the block (no header above it)
-    _draw_text_block(c, ix, block_y + CTA_BLOCK_H - 0.35 * inch,
+    _draw_text_block(c, ix, block_y + CTA_BLOCK_H - 0.28 * inch,
                      body_w, body,
                      _font("OpenSans"), body_sz, body_lead, WHITE, max_lines=MAX_BODY_LINES)
 
