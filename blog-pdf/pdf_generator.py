@@ -561,12 +561,15 @@ def generate_pdf(data: dict, image_paths: Optional[dict] = None) -> bytes:
     # so all bottom boundaries are derived from real content height.
     cta_block_h = _calc_cta_block_h(elev_body)
     cta_gap     = 0.18 * inch   # gap between footer band top and CTA block bottom
-    sep_gap     = 0.25 * inch   # gap between CTA block top and separator line
-    read_gap    = 0.22 * inch   # min gap between separator and read-more link
+    read_link_h = 14            # height of "read full article" line in pts
+    read_gap    = 0.18 * inch   # gap between last section text and read-more link
+    sep_gap     = 0.14 * inch   # gap between read-more link and separator line
 
-    # bottom_p2: sections must not go below this line
-    sep_y     = FOOTER_H + cta_gap + cta_block_h + sep_gap
-    bottom_p2 = sep_y + read_gap + 14   # 14pt = one line height for read-more link
+    # Fixed anchors from bottom of page up
+    cta_base  = FOOTER_H + cta_gap                   # bottom edge of CTA block
+    sep_fixed = cta_base + cta_block_h + sep_gap     # separator line position
+    # Sections must leave room above separator for the read-more link
+    bottom_p2 = sep_fixed + sep_gap + read_link_h + read_gap
 
     for idx, section in enumerate(sections):
         hdr  = section.get("header", "")
@@ -606,9 +609,15 @@ def generate_pdf(data: dict, image_paths: Optional[dict] = None) -> bytes:
                                  max_lines=ml)
         y -= 0.3 * inch
 
-    # "Read the full article" link — sits just above the separator
+    # CTA block and separator are anchored at bottom of page.
+    # "Read the full article" floats directly below the last section text,
+    # but is clamped to never go below the separator.
+    sep_y = sep_fixed   # separator fixed above CTA block
+
     if blog_url:
-        read_y = sep_y - read_gap
+        read_y = y - read_gap                   # naturally below last section
+        min_read_y = sep_y + sep_gap + read_link_h  # never below separator
+        read_y = max(read_y, min_read_y)
         c.setFont(_font("OpenSans-Bold"), 9)
         c.setFillColor(CYAN)
         label = "Read the full article \u2192"
@@ -617,7 +626,7 @@ def generate_pdf(data: dict, image_paths: Optional[dict] = None) -> bytes:
                   (MARGIN, read_y - 3, MARGIN + CONTENT_W, read_y + 11),
                   relative=0)
 
-    # Thin separator line — fixed distance above CTA block
+    # Thin separator line — fixed above CTA block
     c.setStrokeColor(HexColor("#DDE1EC"))
     c.setLineWidth(0.75)
     c.line(MARGIN, sep_y, W - MARGIN, sep_y)

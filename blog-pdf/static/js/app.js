@@ -210,6 +210,9 @@ class BlogPdfApp {
 
         this.hideLoading();
         this.resultsSection.classList.remove('hidden');
+        // Make preview card visible (no tabs anymore)
+        const previewTab = document.getElementById('tab-preview');
+        if (previewTab) previewTab.classList.add('active');
 
         const ex = data.extracted || {};
 

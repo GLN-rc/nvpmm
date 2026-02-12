@@ -250,8 +250,10 @@ def _extract_brand_verbatim_docx(file_path: str) -> dict:
         return result
 
     heading_styles = {"heading 1", "heading 2", "heading 3", "heading 4"}
-    pitch_labels = {
-        "boilerplate", "elevator pitch", "short pitch", "about replica",
+    # Two tiers: "boilerplate" is highest priority, fallbacks tried only if not found
+    priority_labels = {"boilerplate"}
+    fallback_labels = {
+        "elevator pitch", "short pitch", "about replica",
         "why replica", "our pitch", "one-liner", "value proposition",
         "company description", "positioning statement"
     }
@@ -261,32 +263,39 @@ def _extract_brand_verbatim_docx(file_path: str) -> dict:
         re.IGNORECASE
     )
 
-    paragraphs = doc.paragraphs
-    i = 0
-    while i < len(paragraphs):
-        p = paragraphs[i]
-        style_name = p.style.name.lower()
-        text = p.text.strip()
-
-        # Check if this is a heading that matches a pitch label
-        if style_name in heading_styles and text.lower() in pitch_labels:
-            # Collect all following paragraphs until the next heading
-            body_parts = []
+    def _collect_section_body(paragraphs, start_idx):
+        """Collect body paragraphs after a heading until the next heading."""
+        body_parts = []
+        i = start_idx
+        while i < len(paragraphs):
+            np = paragraphs[i]
+            np_style = np.style.name.lower()
+            np_text = np.text.strip()
+            if np_style in heading_styles:
+                break
+            if np_text:
+                body_parts.append(np_text)
             i += 1
-            while i < len(paragraphs):
-                np = paragraphs[i]
-                np_style = np.style.name.lower()
-                np_text = np.text.strip()
-                # Stop at any heading
-                if np_style in heading_styles:
-                    break
-                if np_text:
-                    body_parts.append(np_text)
-                i += 1
-            if body_parts:
-                result["elevator_pitch_body"] = " ".join(body_parts).strip()
+        return " ".join(body_parts).strip() if body_parts else ""
+
+    paragraphs = doc.paragraphs
+
+    # Pass 1: look for exact priority label (boilerplate)
+    for i, p in enumerate(paragraphs):
+        if p.style.name.lower() in heading_styles and p.text.strip().lower() in priority_labels:
+            body = _collect_section_body(paragraphs, i + 1)
+            if body:
+                result["elevator_pitch_body"] = body
             break
-        i += 1
+
+    # Pass 2: only if nothing found, try fallback labels
+    if not result.get("elevator_pitch_body"):
+        for i, p in enumerate(paragraphs):
+            if p.style.name.lower() in heading_styles and p.text.strip().lower() in fallback_labels:
+                body = _collect_section_body(paragraphs, i + 1)
+                if body:
+                    result["elevator_pitch_body"] = body
+                break
 
     # CTA: scan entire doc for a URL near demo/contact language
     for p in paragraphs:
