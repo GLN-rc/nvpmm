@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog to PDF - Replica Brief Generator</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header>
+    <div class="container">
+        <h1>Blog → Brief</h1>
+        <p>Paste a blog URL. Get a polished Replica-branded executive PDF in seconds.</p>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
+        <!-- ── INPUT SECTION ──────────────────────────────────────────── -->
+        <section id="input-section">
+            <form id="generate-form" novalidate>
+
+                <!-- Blog URL -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="icon">📄</div>
+                        <h2>Blog Post URL</h2>
+                    </div>
+                    <div class="form-group">
+                        <label for="blog-url">Paste the full URL of the blog post</label>
+                        <input type="url" id="blog-url" name="blog_url"
+                               placeholder="https://replicacyber.com/blog/..."
+                               autocomplete="off" required>
+                        <p class="hint">The page must be publicly accessible. JavaScript-heavy pages may not extract well.</p>
+                    </div>
+                </div>
+
+                <!-- Brand Docs -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="icon">🏷️</div>
+                        <h2>Brand &amp; Positioning Documents <span class="optional-label">(optional but recommended)</span></h2>
+                    </div>
+                    <div class="form-group">
+                        <p class="hint" style="margin-bottom:12px;">
+                            Upload one or more docs — brand guide, messaging framework, product positioning, solution briefs. The AI will pull the elevator pitch, CTA, and key messaging from all of them.
+                        </p>
+                        <div class="file-upload-area" id="doc-drop-area">
+                            <div class="upload-icon">📂</div>
+                            <p>Drag & drop files here, or <span class="browse-link" id="browse-doc-link">browse</span></p>
+                            <p style="font-size:0.8rem;margin-top:6px;">PDF, DOCX, TXT accepted — multiple files OK</p>
+                            <input type="file" id="brand-doc-input" name="brand_docs"
+                                   accept=".pdf,.docx,.doc,.txt,.md" multiple style="display:none">
+                        </div>
+                        <div id="doc-file-list" class="file-list"></div>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="icon">⚙️</div>
+                        <h2>Options</h2>
+                    </div>
+                    <div class="form-group">
+                        <label for="page-preference">Target length</label>
+                        <select id="page-preference" name="page_preference">
+                            <option value="2" selected>2 pages (default — tight, scannable)</option>
+                            <option value="3">3 pages (allow if content is rich)</option>
+                        </select>
+                        <p class="hint">The AI may suggest upgrading to 3 pages if the blog content is dense.</p>
+                    </div>
+                </div>
+
+                <div class="submit-row">
+                    <button type="submit" class="btn btn-primary btn-lg" id="generate-btn">
+                        Generate PDF Brief
+                    </button>
+                </div>
+
+            </form>
+        </section>
+
+        <!-- ── LOADING SECTION ────────────────────────────────────────── -->
+        <section id="loading-section" class="hidden">
+            <div class="card" style="text-align:center;padding:3rem 2rem;">
+                <div class="spinner" style="margin:0 auto 1.5rem;"></div>
+                <h3 style="margin-bottom:1.5rem;color:var(--olive-green-dark);">Generating your brief...</h3>
+                <div class="progress-steps" id="progress-steps">
+                    <div class="progress-step" id="step-fetch">📡 Fetching blog</div>
+                    <div class="progress-step" id="step-doc">📂 Reading brand doc</div>
+                    <div class="progress-step" id="step-ai">🤖 AI extraction</div>
+                    <div class="progress-step" id="step-pdf">📄 Building PDF</div>
+                </div>
+                <p class="loading-text" id="loading-message">Fetching blog content...</p>
+            </div>
+        </section>
+
+        <!-- ── RESULTS SECTION ────────────────────────────────────────── -->
+        <section id="results-section" class="hidden">
+
+            <!-- Extra page banner -->
+            <div id="extra-page-banner" class="banner banner-info hidden">
+                <span>💡 This blog has a lot of content. Generate as <strong>3 pages</strong> for a more complete brief?</span>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button class="btn btn-secondary" id="upgrade-pages-btn" style="padding:6px 16px;font-size:0.9rem;">Yes, use 3 pages</button>
+                    <button class="btn btn-outline" id="keep-pages-btn" style="padding:6px 16px;font-size:0.9rem;">No, keep as-is</button>
+                </div>
+            </div>
+
+            <!-- Action bar -->
+            <div class="action-bar">
+                <button class="btn btn-primary" id="download-btn">⬇ Download PDF</button>
+                <button class="btn btn-secondary" id="new-brief-btn">+ New Brief</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-tab="preview">Preview</button>
+                <button class="tab" data-tab="images">Images</button>
+            </div>
+
+            <!-- Preview tab -->
+            <div class="tab-content active" id="tab-preview">
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="icon" style="background:var(--wine);">📋</div>
+                        <h2>Brief Content Preview</h2>
+                    </div>
+
+                    <div class="preview-section">
+                        <div class="preview-label">Title</div>
+                        <div class="preview-value" id="prev-title"></div>
+                    </div>
+                    <div class="preview-section">
+                        <div class="preview-label">Subtitle</div>
+                        <div class="preview-value" id="prev-subtitle"></div>
+                    </div>
+                    <div class="preview-section">
+                        <div class="preview-label">Executive Summary</div>
+                        <div class="preview-value" id="prev-exec-summary"></div>
+                    </div>
+                    <div class="preview-section">
+                        <div class="preview-label">Key Takeaways</div>
+                        <ul class="takeaway-list" id="prev-takeaways"></ul>
+                    </div>
+                    <div class="preview-section">
+                        <div class="preview-label">Sections</div>
+                        <div id="prev-sections"></div>
+                    </div>
+                    <div class="preview-section">
+                        <div class="preview-label">Elevator Pitch Block</div>
+                        <div class="elevator-preview" id="prev-elevator">
+                            <div class="elev-header" id="prev-elev-header"></div>
+                            <div class="elev-body" id="prev-elev-body"></div>
+                            <div class="elev-cta" id="prev-elev-cta"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Images tab -->
+            <div class="tab-content" id="tab-images">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="icon">🖼️</div>
+                        <h2>Image Opportunities</h2>
+                    </div>
+                    <p style="color:var(--grey-medium);margin-bottom:1rem;">
+                        The AI identified spots where a visual would strengthen the brief. Generate an image or upload your own.
+                    </p>
+                    <div id="image-suggestions-list"></div>
+                    <p id="no-image-suggestions" class="hidden" style="color:var(--grey-medium);font-style:italic;">
+                        No image suggestions for this brief.
+                    </p>
+                </div>
+            </div>
+
+        </section>
+
+    </div>
+</main>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

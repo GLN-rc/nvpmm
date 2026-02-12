@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Competitor Scanner | SEO, GEO & LLM Optimization</title>
+    <meta name="description" content="Scan your website and competitors to get AI-powered SEO, GEO, and LLM discoverability optimization suggestions.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Website Competitor Scanner</h1>
+            <p>Analyze your website against competitors and get AI-powered optimization recommendations for SEO, GEO, and LLM discoverability</p>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <!-- Input Form Section -->
+            <section id="input-section">
+                <form id="scan-form">
+                    <!-- Your Website -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                                </svg>
+                            </div>
+                            <h2>Your Website</h2>
+                        </div>
+                        <div class="form-group">
+                            <label for="your-website">Website URL</label>
+                            <input type="url" id="your-website" name="your_website"
+                                   placeholder="https://yourcompany.com" required>
+                            <p class="hint">Enter the main URL of your website to analyze</p>
+                        </div>
+                    </div>
+
+                    <!-- Competitor Websites -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                            </div>
+                            <h2>Competitor Websites</h2>
+                        </div>
+                        <div class="form-group">
+                            <label for="competitor-urls">Competitor URLs</label>
+                            <textarea id="competitor-urls" name="competitor_urls" rows="4"
+                                      placeholder="https://competitor1.com&#10;https://competitor2.com&#10;https://competitor3.com"></textarea>
+                            <p class="hint">Enter up to 5 competitor URLs, one per line or comma-separated</p>
+                        </div>
+                    </div>
+
+                    <!-- Brand Documents -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                    <polyline points="10 9 9 9 8 9"/>
+                                </svg>
+                            </div>
+                            <h2>Brand & Positioning Documents</h2>
+                        </div>
+                        <p style="margin-bottom: var(--spacing-md); color: var(--grey-medium);">
+                            Upload documents that describe your brand, values, positioning, product documentation, or target personas. These help generate more tailored recommendations.
+                        </p>
+                        <div class="file-upload-area" id="file-drop-area">
+                            <div class="upload-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                            </div>
+                            <p>Drag & drop files here or <span class="browse-link">browse</span></p>
+                            <p class="hint">Supports PDF, DOCX, TXT, MD (files are processed but not stored)</p>
+                            <input type="file" id="file-input" multiple accept=".pdf,.docx,.doc,.txt,.md,.rtf" hidden>
+                        </div>
+                        <div class="file-list" id="file-list"></div>
+                    </div>
+
+                    <!-- Focus Areas -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <circle cx="12" cy="12" r="6"/>
+                                    <circle cx="12" cy="12" r="2"/>
+                                </svg>
+                            </div>
+                            <h2>Focus Areas (Optional)</h2>
+                        </div>
+                        <div class="form-group">
+                            <label for="focus-areas">What would you like to prioritize?</label>
+                            <input type="text" id="focus-areas" name="focus_areas"
+                                   placeholder="e.g., LLM discoverability, content quality, technical SEO">
+                            <p class="hint">Comma-separated list of areas you want to focus on</p>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="text-center mt-lg">
+                        <button type="submit" class="btn btn-primary btn-lg" id="scan-button">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                            Analyze Websites
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Loading Section -->
+            <section id="loading-section" class="loading">
+                <div class="spinner"></div>
+                <div class="loading-content">
+                    <p class="loading-text" id="loading-message">Analyzing your website...</p>
+                    <div class="progress-steps" id="progress-steps">
+                        <div class="progress-step" data-step="your-site">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                            </svg>
+                            Your Site
+                        </div>
+                        <div class="progress-step" data-step="competitors">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            </svg>
+                            Competitors
+                        </div>
+                        <div class="progress-step" data-step="documents">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16"/>
+                            </svg>
+                            Documents
+                        </div>
+                        <div class="progress-step" data-step="analysis">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20V10M18 20V4M6 20v-4"/>
+                            </svg>
+                            Analysis
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="results-section">
+                <div class="card">
+                    <!-- Analysis Summary Banner -->
+                    <div id="analysis-summary" style="background: linear-gradient(135deg, var(--olive-green) 0%, var(--olive-green-dark) 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                            <div>
+                                <h2 style="margin: 0 0 5px 0; font-size: 1.3rem;">Analysis Results</h2>
+                                <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;" id="analyzed-url">Page analyzed: Loading...</p>
+                                <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 0.8rem;">Note: Currently analyzing homepage only. Deep site crawl coming soon.</p>
+                            </div>
+                            <button class="btn" id="export-btn" style="background: white; color: var(--olive-green-dark); padding: 10px 20px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                </svg>
+                                Export to Google Docs
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <button class="tab active" data-tab="priority">Priority Actions</button>
+                        <button class="tab" data-tab="copy-suggestions">Copy Suggestions</button>
+                        <button class="tab" data-tab="recommendations">All Recommendations</button>
+                        <button class="tab" data-tab="your-site">Your Site Analysis</button>
+                        <button class="tab" data-tab="competitors-tab">Competitor Comparison</button>
+                    </div>
+
+                    <!-- Priority Actions Tab -->
+                    <div class="tab-content active" id="tab-priority">
+                        <h3 style="margin-bottom: var(--spacing-md);">Top 5 Priority Actions</h3>
+                        <p style="color: var(--grey-medium); margin-bottom: var(--spacing-lg);">
+                            These are the highest-impact actions you should take first, ranked by potential impact and effort required.
+                        </p>
+                        <div class="priority-list" id="priority-list">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Copy Suggestions Tab -->
+                    <div class="tab-content" id="tab-copy-suggestions">
+                        <h3 style="margin-bottom: var(--spacing-md);">Ready-to-Use Copy</h3>
+                        <p style="color: var(--grey-medium); margin-bottom: var(--spacing-lg);">
+                            Drop-in copy suggestions based on your site analysis. Click to copy any suggestion.
+                        </p>
+                        <div id="copy-suggestions-list">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- All Recommendations Tab -->
+                    <div class="tab-content" id="tab-recommendations">
+                        <div class="recommendations-filters" style="margin-bottom: var(--spacing-lg);">
+                            <span style="margin-right: var(--spacing-sm);">Filter by:</span>
+                            <button class="btn btn-outline filter-btn active" data-filter="all">All</button>
+                            <button class="btn btn-outline filter-btn" data-filter="SEO">SEO</button>
+                            <button class="btn btn-outline filter-btn" data-filter="AI Discoverability">AI Discoverability</button>
+                            <button class="btn btn-outline filter-btn" data-filter="Messaging">Messaging</button>
+                            <button class="btn btn-outline filter-btn" data-filter="Technical">Technical</button>
+                            <button class="btn btn-outline filter-btn" data-filter="Competitive">Competitive</button>
+                        </div>
+                        <div id="recommendations-list">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Your Site Analysis Tab -->
+                    <div class="tab-content" id="tab-your-site">
+                        <div class="analysis-grid" id="site-metrics">
+                            <!-- Populated by JavaScript -->
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg); margin-top: var(--spacing-lg);">
+                            <div>
+                                <h4 style="margin-bottom: var(--spacing-md); color: var(--error);">Issues Found</h4>
+                                <ul class="issues-list" id="issues-list">
+                                    <!-- Populated by JavaScript -->
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 style="margin-bottom: var(--spacing-md); color: var(--success);">Strengths</h4>
+                                <ul class="strengths-list" id="strengths-list">
+                                    <!-- Populated by JavaScript -->
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Competitor Comparison Tab -->
+                    <div class="tab-content" id="tab-competitors-tab">
+                        <div id="competitor-comparison">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- New Scan Button -->
+                <div class="text-center mt-lg">
+                    <button class="btn btn-secondary" id="new-scan-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="1 4 1 10 7 10"/>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                        </svg>
+                        Start New Analysis
+                    </button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Website Competitor Scanner | Built for SEO, GEO & LLM Optimization</p>
+        </div>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
