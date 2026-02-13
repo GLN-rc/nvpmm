@@ -140,12 +140,15 @@ async def scan_websites(
             "your_site_analysis": your_site_data,
             "competitor_analyses": competitor_data,
             "recommendations": recommendations["recommendations"],
+            "copy_suggestions": recommendations.get("copy_suggestions", []),
             "priority_actions": recommendations["priority_actions"],
             "metric_insights": metric_insights,
             "metric_explanations": get_all_explanations()
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -219,7 +219,7 @@ class WebsiteScanner {
         this.renderPriorityActions(results.priority_actions);
 
         // Render copy suggestions
-        this.renderCopySuggestions(results.your_site_analysis, results.recommendations);
+        this.renderCopySuggestions(results.your_site_analysis, results.copy_suggestions);
 
         // Render all recommendations
         this.renderRecommendations(results.recommendations);
@@ -689,223 +689,44 @@ class WebsiteScanner {
         `;
     }
 
-    renderCopySuggestions(analysis, recommendations) {
+    renderCopySuggestions(analysis, copySuggestions) {
         const container = document.getElementById('copy-suggestions-list');
         if (!container) return;
 
-        const seo = analysis?.seo_factors || {};
-        const msg = analysis?.page_messaging || {};
-        const geo = analysis?.geo_factors || {};
-        const llm = analysis?.llm_discoverability || {};
-        const currentTitle = seo.title || '';
-        const currentH1 = seo.h1_tags?.[0] || '';
-        const currentMeta = seo.meta_description || '';
-        const companyName = this.extractCompanyName(currentTitle);
-
-        // Pull actual CTAs found on the page
-        const existingCtas = msg.cta_language || [];
-        const existingCtaStr = existingCtas.length > 0
-            ? existingCtas.slice(0, 4).join(' / ')
-            : '(none detected)';
-
-        // Pull key claims / H2s actually on the page
-        const existingClaims = msg.key_claims || [];
-        const existingValueProp = msg.value_proposition || '';
-
-        // Title length feedback
-        const titleLen = seo.title_length || 0;
-        const titleFeedback = titleLen === 0 ? 'Missing — critical issue'
-            : titleLen < 30 ? `${titleLen} chars — too short, losing keyword opportunity`
-            : titleLen > 60 ? `${titleLen} chars — too long, will be cut off in search results`
-            : `${titleLen} chars — good length`;
-
-        // Meta description feedback
-        const metaLen = seo.meta_description_length || 0;
-        const metaFeedback = metaLen === 0 ? 'Missing — search engines will auto-generate one (often poor)'
-            : metaLen > 160 ? `${metaLen} chars — will be truncated in results`
-            : metaLen < 120 ? `${metaLen} chars — could be longer to include more value`
-            : `${metaLen} chars — good length`;
-
-        const suggestions = [];
-
-        // --- 1. Page Title ---
-        const titleSugs = [];
-        if (currentTitle) {
-            // Derive suggestions from actual title
-            const kw = currentTitle.split(/[|\-–—]/)[1]?.trim() || '';
-            titleSugs.push(`${companyName} | ${kw || 'Secure Isolated Browsing'} — Enterprise-Grade Protection`);
-            titleSugs.push(`${kw || 'Browser Isolation'} for Enterprise Security Teams | ${companyName}`);
-        }
-        titleSugs.push(`Zero-Trust Web Security Built for Enterprise | ${companyName}`);
-        suggestions.push({
-            category: "Page Title",
-            current: `${currentTitle || '(No title found)'} — ${titleFeedback}`,
-            items: titleSugs,
-            why: `Titles are the #1 on-page SEO factor. They appear in browser tabs, search results, and are read first by AI systems. Optimal length: 50–60 characters. Include your primary keyword in the first half.`
-        });
-
-        // --- 2. Main Headline (H1) ---
-        const h1Sug = [];
-        if (currentH1) {
-            // Suggest improvements based on what's actually there
-            h1Sug.push(`${currentH1} — Without Slowing Your Team Down`);
-            h1Sug.push(`The ${currentH1.split(' ').slice(0, 3).join(' ')} Built for Enterprise Security`);
-        }
-        h1Sug.push('Stop Web-Based Threats Before They Reach Your Network');
-        h1Sug.push('Isolated Browsing. Zero Compromise. Full Productivity.');
-        suggestions.push({
-            category: "Main Headline (H1)",
-            current: currentH1 || '(No H1 found — this is a critical SEO issue)',
-            items: h1Sug,
-            why: "Your H1 is the first thing both visitors and AI systems read. It must answer 'What does this company do and why should I care?' within 5 seconds. One H1 per page only."
-        });
-
-        // --- 3. Meta Description ---
-        const metaSugs = [
-            `${companyName} isolates web sessions so threats never reach your network. Protect your team without impacting productivity. Book a 15-min demo.`,
-            `Stop phishing, malware, and zero-day attacks at the browser layer. ${companyName} gives enterprise teams secure, isolated browsing. Free security assessment.`,
-            `Trusted by enterprise security teams for zero-trust web access. ${companyName} isolates threats before they hit your endpoints. See how it works in 2 minutes.`
-        ];
-        suggestions.push({
-            category: "Meta Description",
-            current: `${currentMeta ? currentMeta.slice(0, 120) + (currentMeta.length > 120 ? '…' : '') : '(None found)'} — ${metaFeedback}`,
-            items: metaSugs,
-            why: "Meta descriptions are your ad copy in search results — they don't affect ranking directly, but they determine whether someone clicks. Include a clear benefit and a specific CTA. Aim for 150–160 characters."
-        });
-
-        // --- 4. Hero / Value Prop statement ---
-        const vpSugs = [
-            'Web threats stopped at the source. Your productivity stays intact.',
-            '100% of web-borne threats isolated. 0% impact on your team\'s workflow.',
-            `Enterprise security teams trust ${companyName} because we eliminate the browser as an attack surface — without adding friction.`
-        ];
-        suggestions.push({
-            category: "Hero Value Proposition",
-            current: existingValueProp
-                ? `"${existingValueProp.slice(0, 120)}${existingValueProp.length > 120 ? '…' : ''}"`
-                : '(No clear value prop statement detected in hero area)',
-            items: vpSugs,
-            why: "Your value prop should appear above the fold and answer: Who is this for? What problem does it solve? Why you specifically? Lead with the customer outcome, not the product feature."
-        });
-
-        // --- 5. CTA copy ---
-        const ctaSugs = [
-            'See How It Works (2-min demo)',
-            'Get Your Free Security Assessment',
-            'Start Protecting Your Team Today',
-            'Calculate Your Risk Exposure →',
-            'Watch a 90-Second Overview'
-        ];
-        const genericCtaWarning = existingCtas.some(c =>
-            /^(learn more|get started|click here|submit|contact us|read more)$/i.test(c.trim())
-        );
-        suggestions.push({
-            category: "Call-to-Action Buttons",
-            current: `Found on page: ${existingCtaStr}${genericCtaWarning ? ' ⚠ generic CTAs detected' : ''}`,
-            items: ctaSugs,
-            why: "Generic CTAs ('Learn More', 'Get Started') tell visitors nothing about what they'll get. Specific, benefit-driven CTAs improve click-through rates significantly. The CTA should match what stage of awareness the visitor is at."
-        });
-
-        // --- 6. Social proof / trust signals ---
-        const trustSugs = [
-            `Trusted by 500+ enterprise security teams in ${new Date().getFullYear()}`,
-            `"${companyName} reduced our web-based incidents by 94%" — [Customer Name], CISO at [Company]`,
-            'SOC 2 Type II Certified | FedRAMP Authorized | ISO 27001 Compliant',
-            "Featured in Gartner's Market Guide for Browser Isolation"
-        ];
-        suggestions.push({
-            category: "Social Proof & Trust Signals",
-            current: '(Add trust signals near your primary CTA and hero section)',
-            items: trustSugs,
-            why: "Trust signals reduce purchase anxiety and are critical for enterprise buyers. AI systems also use trust signals as authority indicators when deciding what to recommend. Place them near your primary CTA for maximum conversion impact."
-        });
-
-        // --- 7. Differentiation / "Why us" ---
-        const diffSugs = [
-            `Unlike VPNs or endpoint agents, ${companyName} isolates threats at the browser layer — nothing ever touches your network.`,
-            `The only [category] solution that [your specific differentiator] without requiring [common objection].`,
-            `While competitors require agents on every device, ${companyName} works with your existing infrastructure from day one.`
-        ];
-        suggestions.push({
-            category: "Differentiation Statement",
-            current: '(Add a "Why us" or "How we\'re different" section)',
-            items: diffSugs,
-            why: "Enterprise buyers evaluate multiple vendors. If your differentiation isn't explicit, visitors — and AI systems answering 'best [category]' queries — have no reason to choose you over a competitor. Use 'Unlike X, we...' or 'The only solution that...' patterns."
-        });
-
-        // --- 8. FAQ / AI-optimized copy (if no FAQ schema) ---
-        if (!llm.faq_schema) {
-            const faqSugs = [
-                'Q: How is browser isolation different from a VPN?\nA: A VPN encrypts traffic but doesn\'t prevent malicious web content from reaching your device. Browser isolation runs the entire web session in a remote container — threats never execute locally.',
-                'Q: Does it slow down browsing?\nA: No. [Company] uses streaming rendering so pages load at full speed with zero malware risk.',
-                'Q: What threats does it protect against?\nA: Phishing, drive-by downloads, ransomware delivery via web, zero-day exploits, and malvertising — all blocked at the browser layer before they reach your endpoints.'
-            ];
-            suggestions.push({
-                category: "FAQ Copy (for AI & Voice Search)",
-                current: '(No FAQ section or FAQ schema detected)',
-                items: faqSugs,
-                why: "Adding a FAQ section with FAQPage schema markup can trigger rich results in Google and gets your answers surfaced by AI assistants (ChatGPT, Perplexity, Gemini). Write questions exactly as your buyers would ask them. Low effort, high visibility payoff."
-            });
-        }
-
-        // --- 9. Statistics / data points (if none found) ---
-        if (!geo.statistics_present) {
-            const statSugs = [
-                '[X]% of breaches involve web-based vectors — isolate them at the source.',
-                'Deployed across [X] enterprise organizations, protecting [X]M endpoints.',
-                'Average time to deploy: [X] hours. Average reduction in web-borne incidents: [X]%.'
-            ];
-            suggestions.push({
-                category: "Statistics & Data Points",
-                current: '(No specific numbers or statistics detected on page)',
-                items: statSugs,
-                why: "AI systems like ChatGPT and Perplexity strongly prefer citing pages with specific data. Content with concrete numbers is viewed as more credible by both humans and AI. Replace vague claims like 'significantly reduces risk' with specific percentages or quantities."
-            });
-        }
-
-        // --- 10. Section headlines derived from existing H2s ---
-        if (existingClaims.length > 0) {
-            const improvedH2s = existingClaims.slice(0, 3).map(h2 => {
-                // Make H2s more benefit-driven
-                return `${h2.replace(/^(our|the)\s+/i, '')} — Built for Enterprise Security Teams`;
-            });
-            improvedH2s.push('Trusted by Security Teams at [Fortune 500 Companies]');
-            suggestions.push({
-                category: "Section Headlines (H2 improvements)",
-                current: `Current H2s found: ${existingClaims.slice(0, 3).join(' / ')}`,
-                items: improvedH2s,
-                why: "Section headlines (H2s) are used by AI to understand page structure and are often extracted as standalone content. Benefit-driven H2s perform better in AI summaries than feature-focused ones. Each H2 should make sense on its own."
-            });
-        }
-
-        // Render
-        container.innerHTML = suggestions.map(s => `
-            <div style="background: white; border: 1px solid var(--grey-light); border-radius: 8px; padding: 20px; margin-bottom: 15px;">
-                <h4 style="color: var(--olive-green-dark); margin-bottom: 10px;">${s.category}</h4>
-                <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; margin-bottom: 12px; font-size: 0.85rem;">
-                    <strong>Current:</strong> <span style="color: #666;">${s.current}</span>
+        // If LLM returned brand-accurate copy suggestions, use those
+        if (copySuggestions && copySuggestions.length > 0) {
+            container.innerHTML = copySuggestions.map(s => `
+                <div style="background: white; border: 1px solid var(--grey-light); border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                    <h4 style="color: var(--headline); margin-bottom: 10px;">${s.category}</h4>
+                    ${s.current ? `
+                    <div style="background: var(--table-shade); padding: 10px; border-radius: 4px; margin-bottom: 12px; font-size: 0.85rem;">
+                        <strong>Current:</strong> <span style="color: var(--body-text);">${s.current}</span>
+                    </div>` : ''}
+                    ${s.why ? `
+                    <p style="font-size: 0.82rem; color: var(--grey-medium); margin-bottom: 10px; border-left: 3px solid var(--table-border); padding-left: 8px;"><em>Why this matters:</em> ${s.why}</p>` : ''}
+                    <div style="margin-top: 10px;">
+                        <strong style="font-size: 0.82rem; color: var(--body-text);">Suggested copy (click to copy):</strong>
+                        ${(s.suggestions || []).map(item => `
+                            <div class="copy-item"
+                                 onclick="navigator.clipboard.writeText(this.dataset.text); this.style.background='#e8f5e9'; setTimeout(() => this.style.background='var(--table-shade)', 1200);"
+                                 data-text="${item.replace(/"/g, '&quot;')}"
+                                 style="background: var(--table-shade); padding: 12px; margin-top: 8px; border-radius: 4px; cursor: pointer; font-size: 0.875rem; border-left: 3px solid var(--highlight-3); white-space: pre-wrap;">
+                                ${item}
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
-                <p style="font-size: 0.82rem; color: #888; margin-bottom: 10px; border-left: 3px solid var(--grey-light); padding-left: 8px;"><em>Why this matters:</em> ${s.why}</p>
-                <div style="margin-top: 10px;">
-                    <strong style="font-size: 0.82rem; color: #555;">Suggested copy (click to copy):</strong>
-                    ${s.items.map(item => `
-                        <div class="copy-item"
-                             onclick="navigator.clipboard.writeText(this.dataset.text); this.style.background='#e8f5e9'; setTimeout(() => this.style.background='#f5f5f5', 1200);"
-                             data-text="${item.replace(/"/g, '&quot;')}"
-                             style="background: #f5f5f5; padding: 12px; margin-top: 8px; border-radius: 4px; cursor: pointer; font-size: 0.875rem; border-left: 3px solid var(--persimmon); white-space: pre-wrap;">
-                            ${item}
-                        </div>
-                    `).join('')}
-                </div>
+            `).join('');
+            return;
+        }
+
+        // Fallback if no LLM copy suggestions returned
+        container.innerHTML = `
+            <div style="background: var(--table-shade); border-radius: 8px; padding: 24px; text-align: center; color: var(--grey-medium);">
+                <p style="font-size: 1rem; margin-bottom: 8px;">Upload your brand/messaging documents and run the scan to get brand-accurate copy suggestions.</p>
+                <p style="font-size: 0.85rem;">Copy suggestions are generated by AI using your uploaded messaging guide and sales deck — so they reflect your actual brand voice and approved positioning.</p>
             </div>
-        `).join('');
-    }
-
-    extractCompanyName(title) {
-        if (!title) return 'Your Company';
-        // Try to extract company name from title
-        const parts = title.split(/[|\-–—]/);
-        return parts[0]?.trim() || 'Your Company';
+        `;
     }
 
     async exportReport() {

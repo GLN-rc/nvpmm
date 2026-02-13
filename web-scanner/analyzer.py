@@ -54,6 +54,7 @@ class OptimizationAnalyzer:
         recommendations = await self._generate_llm_recommendations(
             your_site=your_site,
             competitor_summary=competitor_summary,
+            competitors=competitors,
             gaps=gaps,
             brand_context=brand_context,
             focus_areas=focus_areas
@@ -61,13 +62,14 @@ class OptimizationAnalyzer:
 
         # Generate priority actions
         priority_actions = self._prioritize_actions(
-            recommendations,
+            recommendations["recommendations"],
             your_site.get("issues", []),
             gaps
         )
 
         return {
-            "recommendations": recommendations,
+            "recommendations": recommendations["recommendations"],
+            "copy_suggestions": recommendations.get("copy_suggestions", []),
             "priority_actions": priority_actions,
             "competitive_gaps": gaps
         }
@@ -222,6 +224,7 @@ class OptimizationAnalyzer:
         self,
         your_site: dict,
         competitor_summary: dict,
+        competitors: list[dict],
         gaps: list[dict],
         brand_context: dict,
         focus_areas: list[str]
@@ -230,7 +233,7 @@ class OptimizationAnalyzer:
 
         # Build the analysis prompt
         prompt = self._build_analysis_prompt(
-            your_site, competitor_summary, gaps, brand_context, focus_areas
+            your_site, competitor_summary, competitors, gaps, brand_context, focus_areas
         )
 
         try:
@@ -261,16 +264,23 @@ Your recommendations must follow these rules without exception:
             )
 
             result = json.loads(response.choices[0].message.content)
-            return result.get("recommendations", [])
+            return {
+                "recommendations": result.get("recommendations", []),
+                "copy_suggestions": result.get("copy_suggestions", [])
+            }
 
         except Exception as e:
             # Fallback to rule-based recommendations if LLM fails
-            return self._generate_fallback_recommendations(your_site, gaps, focus_areas)
+            return {
+                "recommendations": self._generate_fallback_recommendations(your_site, gaps, focus_areas),
+                "copy_suggestions": []
+            }
 
     def _build_analysis_prompt(
         self,
         your_site: dict,
         competitor_summary: dict,
+        competitors: list[dict],
         gaps: list[dict],
         brand_context: dict,
         focus_areas: list[str]
@@ -335,18 +345,20 @@ Domain: {your_site.get('domain')}
 ## Competitive Gaps Identified
 {json.dumps(gaps, indent=2)}
 
-## Brand Context (from uploaded documents)
-Key Brand Elements: {brand_context.get('all_brand_elements', {})}
+## Brand & Messaging Documents (uploaded by user)
+These documents define the approved brand voice, product positioning, messaging hierarchy, and approved claims.
+ALL copy suggestions and messaging recommendations MUST align with these documents.
+Use the exact product name, approved value propositions, and approved messaging found here.
+Do NOT invent capabilities, statistics, or positioning not present in these documents.
 
-Full Brand Document Content:
-{brand_context.get('combined_content', 'No documents uploaded')[:4000]}
+{brand_context.get('combined_content', 'No documents uploaded')[:12000]}
 
 ## Focus Areas Requested
 {focus_areas if focus_areas else 'General optimization across SEO, AI discoverability, and messaging'}
 
 ---
 
-Based on this analysis, provide 8-12 specific, prioritized recommendations.
+Based on this analysis, provide 8-12 specific, prioritized recommendations AND brand-accurate copy suggestions.
 
 OUTPUT FORMAT — return only valid JSON:
 {{
@@ -365,15 +377,83 @@ OUTPUT FORMAT — return only valid JSON:
       ],
       "expected_outcome": "Specific, measurable outcome — e.g. 'Appear in AI responses for [query type]' or 'Improve click-through for [topic] searches'"
     }}
+  ],
+  "copy_suggestions": [
+    {{
+      "category": "Page Title",
+      "current": "current title tag text",
+      "why": "Why this matters for SEO and AI discoverability",
+      "suggestions": [
+        "Suggested title option 1 — 50-60 chars, keyword first",
+        "Suggested title option 2",
+        "Suggested title option 3"
+      ]
+    }},
+    {{
+      "category": "Main Headline (H1)",
+      "current": "current H1 text",
+      "why": "Why the H1 matters",
+      "suggestions": [
+        "Suggested H1 option 1 — benefit-driven, brand-accurate",
+        "Suggested H1 option 2",
+        "Suggested H1 option 3"
+      ]
+    }},
+    {{
+      "category": "Meta Description",
+      "current": "current meta description",
+      "why": "Why meta descriptions matter for click-through",
+      "suggestions": [
+        "Suggested meta description 1 — 150-160 chars, includes CTA",
+        "Suggested meta description 2",
+        "Suggested meta description 3"
+      ]
+    }},
+    {{
+      "category": "Hero Value Proposition",
+      "current": "current hero/value prop text",
+      "why": "Why the value prop matters",
+      "suggestions": [
+        "Suggested value prop 1 — outcome-first, brand-accurate",
+        "Suggested value prop 2",
+        "Suggested value prop 3"
+      ]
+    }},
+    {{
+      "category": "Differentiation Statement",
+      "current": "(assessment of current differentiation on page)",
+      "why": "Why explicit differentiation matters for buyers and AI",
+      "suggestions": [
+        "Suggested differentiator 1 — uses exact brand positioning from docs",
+        "Suggested differentiator 2",
+        "Suggested differentiator 3"
+      ]
+    }},
+    {{
+      "category": "FAQ Copy (for AI & Search)",
+      "current": "(assessment of current FAQ content)",
+      "why": "Why FAQ schema boosts AI and voice search visibility",
+      "suggestions": [
+        "Q: [question buyers actually ask]\\nA: [direct answer using brand-accurate language]",
+        "Q: [another real buyer question]\\nA: [answer from brand positioning]",
+        "Q: [competitor comparison question]\\nA: [answer that highlights your differentiators]"
+      ]
+    }}
   ]
 }}
 
-STRICT OUTPUT RULES:
+COPY SUGGESTIONS RULES — critical:
+- Every suggestion must use the EXACT product/brand name from the uploaded documents
+- Never invent statistics, customer counts, certifications, or capabilities not in the brand docs
+- Base differentiation statements on the actual positioning in the brand docs, not generic patterns
+- FAQ answers must reflect the actual product capabilities described in the docs
+- Write for the actual audience described in the brand docs (not generic "enterprise teams")
+- Suggestions should be immediately usable — no [placeholder] text unless it's clearly a stat the client needs to fill in from their own data
+
+STRICT RECOMMENDATION RULES:
 - Use "AI Discoverability" for all GEO/LLM recommendations (not separate categories)
 - Zero duplicate recommendations — each card must address a distinct issue
 - Every description must reference this site's actual title, H1, content, or brand doc — no generic advice
-- Copy suggestions must use the exact product name from the brand doc
-- Never invent statistics or capabilities — if data is needed, recommend a strategy to create it
 - Technical issues get a single "Technical" card covering all of them
 - At least 2 recommendations must directly address competitor keyword gaps
 - At least 1 recommendation must address AI answer-engine discoverability (how to get cited by ChatGPT/Perplexity)

@@ -14,7 +14,7 @@ class DocumentProcessor:
     """Process uploaded documents to extract brand and positioning content."""
 
     SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt", ".md", ".rtf"}
-    MAX_CONTENT_LENGTH = 50000  # Characters
+    MAX_CONTENT_LENGTH = 80000  # Characters
 
     def extract_content(self, file_path: str, original_filename: str) -> dict:
         """
@@ -248,19 +248,21 @@ class BrandContextBuilder:
             "total_word_count": 0
         }
 
-        for doc in documents:
-            if doc.get("status") == "success":
-                # Combine content
-                if doc.get("content"):
-                    context["combined_content"] += f"\n\n--- {doc.get('filename', 'Document')} ---\n"
-                    context["combined_content"] += doc["content"]
-                    context["total_word_count"] += doc.get("word_count", 0)
+        # Calculate per-doc character budget so all docs get fair representation
+        successful_docs = [d for d in documents if d.get("status") == "success" and d.get("content")]
+        per_doc_limit = 12000 // max(len(successful_docs), 1)
 
-                # Merge brand elements
-                if "brand_elements" in doc:
-                    for key, values in doc["brand_elements"].items():
-                        if key in context["all_brand_elements"]:
-                            context["all_brand_elements"][key].extend(values)
+        for doc in successful_docs:
+            # Combine content with per-doc limit so no single doc crowds out others
+            context["combined_content"] += f"\n\n=== DOCUMENT: {doc.get('filename', 'Uploaded Document')} ===\n"
+            context["combined_content"] += doc["content"][:per_doc_limit]
+            context["total_word_count"] += doc.get("word_count", 0)
+
+            # Merge brand elements
+            if "brand_elements" in doc:
+                for key, values in doc["brand_elements"].items():
+                    if key in context["all_brand_elements"]:
+                        context["all_brand_elements"][key].extend(values)
 
         # Deduplicate brand elements
         for key in context["all_brand_elements"]:
