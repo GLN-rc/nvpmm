@@ -670,6 +670,13 @@ class WebsiteScanner {
                                 ${msg.cta_language.slice(0, 5).map(ct => `<span style="background: #fff0e8; color: var(--persimmon); padding: 2px 8px; border-radius: 10px; font-size: 0.78rem;">${ct}</span>`).join('')}
                             </div>
                         </div>` : ''}
+                        ${msg.keyword_targets && msg.keyword_targets.length > 0 ? `
+                        <div style="grid-column: 1 / -1;">
+                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 5px;">Keywords they appear to be targeting</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                ${msg.keyword_targets.map(kw => `<span style="background: var(--grey-lightest); color: var(--grey-dark); border: 1px solid var(--grey-light); padding: 2px 10px; border-radius: 10px; font-size: 0.78rem; font-weight: 500;">${kw}</span>`).join('')}
+                            </div>
+                        </div>` : ''}
                     </div>
                 </div>
             `;

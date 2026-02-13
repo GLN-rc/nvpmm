@@ -119,6 +119,42 @@ class OptimizationAnalyzer:
         summary["seo_patterns"] = seo_features
         return summary
 
+    def _format_competitor_keywords(self, competitors: list[dict]) -> str:
+        """Format competitor keyword targets for the LLM prompt."""
+        lines = []
+        for comp in competitors:
+            if comp.get("status") != "success":
+                continue
+            domain = comp.get("domain", comp.get("url", "Competitor"))
+            keywords = comp.get("page_messaging", {}).get("keyword_targets", [])
+            title = comp.get("seo_factors", {}).get("title", "")
+            h1s = comp.get("seo_factors", {}).get("h1_tags", [])
+            if keywords:
+                lines.append(f"- {domain}: {', '.join(keywords[:6])}")
+            elif title:
+                lines.append(f"- {domain}: [derived from title] {title[:100]}")
+        return "\n".join(lines) if lines else "No competitor keyword data available"
+
+    def _format_competitor_messaging(self, competitors: list[dict]) -> str:
+        """Format competitor messaging angles for the LLM prompt."""
+        lines = []
+        for comp in competitors:
+            if comp.get("status") != "success":
+                continue
+            domain = comp.get("domain", comp.get("url", "Competitor"))
+            msg = comp.get("page_messaging", {})
+            primary = msg.get("primary_message", "")
+            audience = msg.get("apparent_audience", "")
+            tone = msg.get("tone", "")
+            if primary:
+                line = f"- {domain}: \"{primary[:120]}\""
+                if audience:
+                    line += f" | Audience: {audience}"
+                if tone:
+                    line += f" | Tone: {tone}"
+                lines.append(line)
+        return "\n".join(lines) if lines else "No competitor messaging data available"
+
     def _identify_gaps(self, your_site: dict, competitors: list[dict]) -> list[dict]:
         """Identify gaps where competitors are doing better."""
         gaps = []
@@ -203,12 +239,16 @@ class OptimizationAnalyzer:
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are an expert in SEO, GEO (Generative Engine Optimization),
-                        and LLM discoverability. You help companies optimize their websites and content
-                        to rank better in traditional search, AI search results, and LLM responses.
+                        "content": """You are a senior SEO and content strategist specializing in B2B cybersecurity and enterprise software. You understand both traditional SEO (Google rankings) and AI/GEO discoverability (how ChatGPT, Perplexity, Gemini, and Claude surface and cite pages).
 
-                        Provide specific, actionable recommendations with clear implementation steps.
-                        Focus on high-impact changes that align with the brand's positioning."""
+Your recommendations must follow these rules without exception:
+1. BRAND ACCURACY: Use the exact product/brand name from the documents. Never shorten, alter, or genericize it.
+2. NO INVENTED CLAIMS: Never invent statistics, capabilities, or proof points not present in the brand documents. If you want to recommend adding data, say so as a strategy — don't fabricate it.
+3. KEYWORD COMPETITION: Reference the specific keywords competitors appear to be targeting (provided in competitor analysis). Recommend how to compete for, differentiate from, or flank those terms.
+4. REAL SEO PRACTICES: Search intent alignment, semantic keyword clustering, E-E-A-T signals, title/meta optimization using actual page content.
+5. REAL AI DISCOVERABILITY: Direct-answer content formatting, FAQ schema, citation-worthy framing, structured content AI can extract and quote verbatim.
+6. COPY SPECIFICITY: When suggesting copy, write real candidate headlines/titles/descriptions specific to this brand's actual positioning — never use placeholder patterns like "Company X solves Y for Z teams."
+7. COMPETITIVE INSIGHT: Identify where competitors are strong on specific query types and recommend content or structural changes to compete."""
                     },
                     {
                         "role": "user",
@@ -281,55 +321,69 @@ Domain: {your_site.get('domain')}
 ### Current Strengths
 {json.dumps(your_site.get('strengths', []), indent=2)}
 
-## Competitor Summary
+## Competitor Intelligence
 - Competitors Analyzed: {competitor_summary.get('successful_scans', 0)}
 - Competitors with Structured Data: {competitor_summary.get('seo_patterns', {}).get('has_structured_data', 0)}
-- Average Word Count: {competitor_summary.get('seo_patterns', {}).get('avg_word_count', 0)}
+- Average Competitor Word Count: {competitor_summary.get('seo_patterns', {}).get('avg_word_count', 0)}
+
+### Competitor Keyword Targets (terms they appear to be optimizing for):
+{self._format_competitor_keywords(competitors)}
+
+### Competitor Messaging Angles:
+{self._format_competitor_messaging(competitors)}
 
 ## Competitive Gaps Identified
 {json.dumps(gaps, indent=2)}
 
 ## Brand Context (from uploaded documents)
-Key Elements: {brand_context.get('all_brand_elements', {})}
+Key Brand Elements: {brand_context.get('all_brand_elements', {})}
 
-Document Content (first 3000 chars):
-{brand_context.get('combined_content', 'No documents uploaded')[:3000]}
+Full Brand Document Content:
+{brand_context.get('combined_content', 'No documents uploaded')[:4000]}
 
-## Focus Areas
-{focus_areas if focus_areas else 'General optimization'}
+## Focus Areas Requested
+{focus_areas if focus_areas else 'General optimization across SEO, AI discoverability, and messaging'}
 
 ---
 
-Based on this analysis, provide 8-12 specific, prioritized recommendations in this JSON format:
+Based on this analysis, provide 8-12 specific, prioritized recommendations.
+
+OUTPUT FORMAT — return only valid JSON:
 {{
   "recommendations": [
     {{
       "id": 1,
       "category": "SEO|AI Discoverability|Technical|Messaging|Competitive",
-      "title": "Brief title of recommendation",
-      "description": "Detailed description of what to do and why — be specific to THIS site, not generic",
+      "title": "Specific, action-oriented title",
+      "description": "2-3 sentences: what to do, why it matters for this specific site, and how it relates to what competitors are doing. Must reference actual content from this site or brand doc.",
       "impact": "high|medium|low",
       "effort": "low|medium|high",
-      "specific_actions": ["Action 1", "Action 2"],
-      "expected_outcome": "What specific improvement to expect"
+      "specific_actions": [
+        "Concrete step 1 — specific to this site's actual content",
+        "Concrete step 2",
+        "Concrete step 3"
+      ],
+      "expected_outcome": "Specific, measurable outcome — e.g. 'Appear in AI responses for [query type]' or 'Improve click-through for [topic] searches'"
     }}
   ]
 }}
 
-IMPORTANT RULES:
-- GEO and LLM are the same goal (AI discoverability). Use category "AI Discoverability" for both.
-- Do NOT generate duplicate recommendations. If FAQ schema appears once, do not add it again.
-- Make descriptions specific to this site's actual content, title, and issues — not generic advice.
-- If brand documents are provided, use them to make copy and messaging recommendations specific to their actual positioning.
-- Technical issues (missing sitemap, robots.txt, HTTPS) must appear as a "Technical" category card with plain-language explanations.
-- Competitive gap recommendations must explain in plain language WHY the gap matters and WHAT to do specifically.
+STRICT OUTPUT RULES:
+- Use "AI Discoverability" for all GEO/LLM recommendations (not separate categories)
+- Zero duplicate recommendations — each card must address a distinct issue
+- Every description must reference this site's actual title, H1, content, or brand doc — no generic advice
+- Copy suggestions must use the exact product name from the brand doc
+- Never invent statistics or capabilities — if data is needed, recommend a strategy to create it
+- Technical issues get a single "Technical" card covering all of them
+- At least 2 recommendations must directly address competitor keyword gaps
+- At least 1 recommendation must address AI answer-engine discoverability (how to get cited by ChatGPT/Perplexity)
 
-Prioritize recommendations that:
-1. Address high-severity issues first
-2. Close competitive gaps
-3. Improve AI/LLM search discoverability
-4. Align with the brand positioning from uploaded documents
-5. Have high impact with reasonable effort"""
+Prioritize in this order:
+1. High-severity technical/SEO issues (blocks everything else)
+2. Competitive keyword gaps where competitors rank and you don't
+3. AI discoverability and citation-readiness
+4. Messaging alignment with brand positioning
+5. Quick wins (high impact, low effort)"""
 
         return prompt
 

@@ -1,31 +1,42 @@
 /*
  * Website Competitor Scanner - Styles
- * Brand Colors: Olive Green, Persimmon, Paperwhite/Ivory, Grey
+ * Color scheme: Soft Linen, Deep Plum, Slate Blue, Muted Rose, Warm Gray
  * Fonts: Sora (headings) + Inter (body)
  */
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    /* Brand Colors */
-    --olive-green: #708238;
-    --olive-green-dark: #5a6a2c;
-    --olive-green-light: #8a9f4a;
-    --persimmon: #C0504D;
-    --persimmon-dark: #a03f3d;
-    --persimmon-light: #d06866;
-    --wine: #6D1379;
-    --paperwhite: #faf9f6;
-    --ivory: #fffff0;
-    --grey-dark: #4a4a4a;
-    --grey-medium: #6b6b6b;
-    --grey-light: #e5e5e5;
-    --grey-lightest: #f5f5f5;
+    /* New Brand Palette */
+    --page-bg:       #F9F8F6;   /* Soft linen */
+    --headline:      #4A3453;   /* Deep muted plum */
+    --headline-alt:  #4A4453;   /* Slightly cooler plum variant */
+    --body-text:     #333333;   /* Soft charcoal */
+    --highlight-1:   #A49A87;   /* Warm gray */
+    --highlight-2:   #7B8BA3;   /* Dusty slate blue */
+    --highlight-3:   #B38B91;   /* Muted rose/raspberry */
+    --table-border:  #A49A87;   /* Warm gray */
+    --table-shade:   #F2F0ED;   /* Pale stone */
 
-    /* Semantic Colors */
-    --success: #708238;
-    --warning: #C0504D;
-    --error: #d32f2f;
-    --info: #1976d2;
+    /* Legacy aliases so existing JS inline styles still work */
+    --olive-green:       #4A3453;
+    --olive-green-dark:  #3a2742;
+    --olive-green-light: #6b5480;
+    --persimmon:         #B38B91;
+    --persimmon-dark:    #9a737a;
+    --persimmon-light:   #c9a3a9;
+    --wine:              #4A3453;
+    --paperwhite:        #F9F8F6;
+    --ivory:             #F2F0ED;
+    --grey-dark:         #333333;
+    --grey-medium:       #6b6b6b;
+    --grey-light:        #ddd9d4;
+    --grey-lightest:     #F2F0ED;
+
+    /* Semantic */
+    --success: #5a7a4a;
+    --warning: #A49A87;
+    --error:   #b85050;
+    --info:    #7B8BA3;
 
     /* Typography */
     --font-heading: 'Sora', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -47,9 +58,9 @@
     --radius-xl: 16px;
 
     /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-    --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
-    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+    --shadow-sm: 0 1px 3px rgba(74,52,83,0.06);
+    --shadow-md: 0 4px 10px rgba(74,52,83,0.08);
+    --shadow-lg: 0 10px 24px rgba(74,52,83,0.11);
 }
 
 * {
@@ -60,8 +71,8 @@
 
 body {
     font-family: var(--font-primary);
-    background-color: var(--paperwhite);
-    color: var(--grey-dark);
+    background-color: var(--page-bg);
+    color: var(--body-text);
     line-height: 1.6;
     min-height: 100vh;
 }
@@ -75,8 +86,8 @@ body {
 
 /* Header */
 header {
-    background: linear-gradient(135deg, var(--olive-green) 0%, var(--olive-green-dark) 100%);
-    color: var(--paperwhite);
+    background: linear-gradient(135deg, var(--headline) 0%, var(--olive-green-dark) 100%);
+    color: var(--page-bg);
     padding: var(--spacing-xl) 0;
     margin-bottom: var(--spacing-2xl);
 }
@@ -86,11 +97,13 @@ header h1 {
     font-size: 2rem;
     font-weight: 700;
     margin-bottom: var(--spacing-sm);
+    color: #fff;
 }
 
 header p {
     font-size: 1.1rem;
-    opacity: 0.9;
+    opacity: 0.88;
+    color: #e8e2f0;
 }
 
 /* Main Content */
@@ -103,6 +116,7 @@ main {
     background: white;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
+    border: 1px solid var(--table-shade);
     padding: var(--spacing-xl);
     margin-bottom: var(--spacing-lg);
 }
@@ -113,20 +127,20 @@ main {
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-lg);
     padding-bottom: var(--spacing-md);
-    border-bottom: 2px solid var(--grey-lightest);
+    border-bottom: 2px solid var(--table-shade);
 }
 
 .card-header h2 {
     font-family: var(--font-heading);
     font-size: 1.25rem;
     font-weight: 600;
-    color: var(--olive-green-dark);
+    color: var(--headline);
 }
 
 .card-header .icon {
     width: 32px;
     height: 32px;
-    background: var(--olive-green);
+    background: var(--headline);
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
@@ -167,8 +181,8 @@ textarea {
 input:focus,
 textarea:focus {
     outline: none;
-    border-color: var(--olive-green);
-    box-shadow: 0 0 0 3px rgba(112, 130, 56, 0.15);
+    border-color: var(--highlight-2);
+    box-shadow: 0 0 0 3px rgba(123, 139, 163, 0.18);
 }
 
 input::placeholder,
@@ -189,8 +203,8 @@ textarea::placeholder {
 
 .file-upload-area:hover,
 .file-upload-area.dragover {
-    border-color: var(--olive-green);
-    background: rgba(112, 130, 56, 0.05);
+    border-color: var(--highlight-2);
+    background: rgba(123, 139, 163, 0.06);
 }
 
 .file-upload-area .upload-icon {
@@ -459,12 +473,12 @@ textarea::placeholder {
 }
 
 .badge-impact-high {
-    background: var(--persimmon);
+    background: var(--highlight-3);
     color: white;
 }
 
 .badge-impact-medium {
-    background: #f59e0b;
+    background: var(--highlight-1);
     color: white;
 }
 
@@ -474,17 +488,17 @@ textarea::placeholder {
 }
 
 .badge-effort-low {
-    background: #10b981;
+    background: #5a7a4a;
     color: white;
 }
 
 .badge-effort-medium {
-    background: #f59e0b;
+    background: var(--highlight-1);
     color: white;
 }
 
 .badge-effort-high {
-    background: #ef4444;
+    background: var(--highlight-3);
     color: white;
 }
 

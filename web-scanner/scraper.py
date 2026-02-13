@@ -432,6 +432,44 @@ class WebsiteScraper:
         else:
             messaging["tone"] = "Professional / Corporate"
 
+        # ── Keyword targeting signals ─────────────────────────────────────────
+        # Extract the terms this page appears to be optimizing for, by looking at:
+        # title, H1, H2s, meta description, and repeated noun phrases in body text.
+        keyword_signals = []
+
+        # Title + H1 words (high-weight SEO signals)
+        title_text = seo_factors.get("title", "") if hasattr(self, '_last_seo') else ""
+        # Pull from soup directly
+        title_tag = soup.find("title")
+        meta_desc_tag = soup.find("meta", attrs={"name": re.compile(r"description", re.I)})
+        title_raw = title_tag.get_text(strip=True) if title_tag else ""
+        meta_raw = meta_desc_tag.get("content", "") if meta_desc_tag else ""
+
+        # Collect candidate keyword phrases from title, h1, h2s
+        candidate_sources = [title_raw, messaging.get("primary_message", "")] + (messaging.get("key_claims") or [])
+        if meta_raw:
+            candidate_sources.append(meta_raw)
+
+        seen = set()
+        for source in candidate_sources:
+            # Extract 2-4 word noun-phrase-like chunks: sequences of cap/lower words
+            phrases = re.findall(r'\b([A-Za-z][a-z]+(?:\s+[A-Za-z][a-z]+){1,3})\b', source)
+            for phrase in phrases:
+                p = phrase.lower().strip()
+                # Filter out stop-phrase-only results
+                stop = {"the", "and", "for", "with", "that", "this", "your", "from", "are", "our", "you", "how"}
+                words = p.split()
+                if len(words) < 2:
+                    continue
+                if all(w in stop for w in words):
+                    continue
+                if p not in seen:
+                    seen.add(p)
+                    keyword_signals.append(phrase.strip())
+
+        # Deduplicate and keep top 8 most meaningful (prefer shorter, title-sourced)
+        messaging["keyword_targets"] = keyword_signals[:8]
+
         return messaging
 
     def _compile_findings(self, result: dict) -> tuple[list, list]:
