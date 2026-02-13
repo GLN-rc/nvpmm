@@ -260,7 +260,7 @@ Your recommendations must follow these rules without exception:
                 ],
                 response_format={"type": "json_object"},
                 temperature=0.7,
-                max_tokens=4000
+                max_tokens=6000
             )
 
             result = json.loads(response.choices[0].message.content)

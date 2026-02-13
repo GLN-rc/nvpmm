@@ -217,14 +217,22 @@
 
                     <!-- All Recommendations Tab -->
                     <div class="tab-content" id="tab-recommendations">
-                        <div class="recommendations-filters" style="margin-bottom: var(--spacing-lg);">
-                            <span style="margin-right: var(--spacing-sm);">Filter by:</span>
-                            <button class="btn btn-outline filter-btn active" data-filter="all">All</button>
-                            <button class="btn btn-outline filter-btn" data-filter="SEO">SEO</button>
-                            <button class="btn btn-outline filter-btn" data-filter="AI Discoverability">AI Discoverability</button>
-                            <button class="btn btn-outline filter-btn" data-filter="Messaging">Messaging</button>
-                            <button class="btn btn-outline filter-btn" data-filter="Technical">Technical</button>
-                            <button class="btn btn-outline filter-btn" data-filter="Competitive">Competitive</button>
+                        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: var(--spacing-lg);">
+                            <div>
+                                <span style="font-size: 0.82rem; color: var(--grey-medium); margin-right: 6px;">Filter:</span>
+                                <button class="btn btn-outline filter-btn active" data-filter="all" style="padding: 5px 12px; font-size: 0.82rem;">All</button>
+                                <button class="btn btn-outline filter-btn" data-filter="SEO" style="padding: 5px 12px; font-size: 0.82rem;">SEO</button>
+                                <button class="btn btn-outline filter-btn" data-filter="AI Discoverability" style="padding: 5px 12px; font-size: 0.82rem;">AI Discoverability</button>
+                                <button class="btn btn-outline filter-btn" data-filter="Messaging" style="padding: 5px 12px; font-size: 0.82rem;">Messaging</button>
+                                <button class="btn btn-outline filter-btn" data-filter="Technical" style="padding: 5px 12px; font-size: 0.82rem;">Technical</button>
+                                <button class="btn btn-outline filter-btn" data-filter="Competitive" style="padding: 5px 12px; font-size: 0.82rem;">Competitive</button>
+                            </div>
+                            <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 0.82rem; color: var(--grey-medium);">Sort by:</span>
+                                <button class="btn btn-outline sort-btn active" data-sort="default" style="padding: 5px 12px; font-size: 0.82rem;">Default</button>
+                                <button class="btn btn-outline sort-btn" data-sort="impact" style="padding: 5px 12px; font-size: 0.82rem;">Impact ↓</button>
+                                <button class="btn btn-outline sort-btn" data-sort="effort" style="padding: 5px 12px; font-size: 0.82rem;">Effort ↑</button>
+                            </div>
                         </div>
                         <div id="recommendations-list">
                             <!-- Populated by JavaScript -->

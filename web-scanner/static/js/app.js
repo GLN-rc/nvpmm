@@ -51,6 +51,11 @@ class WebsiteScanner {
             btn.addEventListener('click', () => this.filterRecommendations(btn.dataset.filter));
         });
 
+        // Sort buttons
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.sortRecommendations(btn.dataset.sort));
+        });
+
         // New scan button
         document.getElementById('new-scan-btn')?.addEventListener('click', () => this.resetForm());
     }
@@ -221,8 +226,11 @@ class WebsiteScanner {
         // Render copy suggestions
         this.renderCopySuggestions(results.your_site_analysis, results.copy_suggestions);
 
+        // Store recommendations for sorting/filtering
+        this.allRecommendations = results.recommendations || [];
+
         // Render all recommendations
-        this.renderRecommendations(results.recommendations);
+        this.renderRecommendations(this.allRecommendations);
 
         // Render site analysis with explanations
         this.renderSiteAnalysis(results.your_site_analysis, results.metric_insights);
@@ -506,21 +514,75 @@ class WebsiteScanner {
         const metrics = [
             {
                 label: 'Word Count',
-                tooltip: 'Total words on the homepage. More content generally signals depth & expertise. Homepages: aim for 500–1,000+. Key landing pages: 1,500–2,500+. If a competitor has significantly more words, search engines and AI may view their page as more comprehensive.',
+                tooltip: 'Total words on the page. More content signals depth and expertise to search engines and AI. Homepages: aim for 500–1,000+. Landing pages: 1,500–2,500+.',
                 good: (v) => v >= 500,
                 warn: (v) => v > 0 && v < 500,
                 your: yourSeo.word_count ?? 'N/A',
                 comp: (c) => c.seo_factors?.word_count ?? 'N/A',
                 context: (v) => {
                     if (!yourWords || !v || isNaN(v)) return '';
-                    if (v > yourWords * 1.5) return ' ▲ more than you';
-                    if (v < yourWords * 0.7) return ' ▼ less than you';
+                    if (v > yourWords * 1.5) return ' ▲ more';
+                    if (v < yourWords * 0.7) return ' ▼ less';
                     return ' ≈ similar';
                 }
             },
             {
+                label: 'H2 Sections',
+                tooltip: 'Number of H2 section headings. H2s define page structure for both users and AI. Each major topic should have its own H2. More H2s = more structured, more scannable, more AI-extractable content.',
+                good: (v) => v >= 4,
+                warn: (v) => v > 0 && v < 4,
+                your: yourSeo.h2_tags?.length ?? 0,
+                comp: (c) => c.seo_factors?.h2_tags?.length ?? 0,
+                context: () => ''
+            },
+            {
+                label: 'Internal Links',
+                tooltip: 'Number of internal links on the page. Internal links distribute PageRank across your site and help search engines discover and index all your pages. More is generally better, up to a natural limit.',
+                good: (v) => v >= 10,
+                warn: (v) => v > 0 && v < 10,
+                your: yourSeo.internal_links ?? 0,
+                comp: (c) => c.seo_factors?.internal_links ?? 0,
+                context: () => ''
+            },
+            {
+                label: 'External Links',
+                tooltip: 'Links to other domains. Outbound links to authoritative sources are an E-E-A-T signal — they show you\'re citing credible references. AI systems also favor pages that link to evidence.',
+                good: (v) => v >= 2,
+                warn: (v) => v === 1,
+                your: yourSeo.external_links ?? 0,
+                comp: (c) => c.seo_factors?.external_links ?? 0,
+                context: () => ''
+            },
+            {
+                label: 'Images',
+                tooltip: 'Total images on the page. Images improve engagement and dwell time. Check that all images have descriptive alt text for accessibility and image SEO.',
+                good: (v) => v >= 3,
+                warn: (v) => v > 0 && v < 3,
+                your: yourSeo.images_total ?? 0,
+                comp: (c) => c.seo_factors?.images_total ?? 0,
+                context: () => ''
+            },
+            {
+                label: 'Images Missing Alt',
+                tooltip: 'Images without alt text are invisible to screen readers and search engines. Alt text is an easy SEO win and accessibility requirement. Should be 0.',
+                good: (v) => v === 0,
+                warn: (v) => v > 0 && v <= 3,
+                your: yourSeo.images_without_alt ?? 0,
+                comp: (c) => c.seo_factors?.images_without_alt ?? 0,
+                context: () => ''
+            },
+            {
+                label: 'Title Length',
+                tooltip: 'Page title character count. Optimal is 50–60 characters — long enough to be descriptive, short enough not to be cut off in search results.',
+                good: (v) => v >= 30 && v <= 60,
+                warn: (v) => v > 60 || (v > 0 && v < 30),
+                your: yourSeo.title_length ?? 0,
+                comp: (c) => c.seo_factors?.title_length ?? 0,
+                context: () => ''
+            },
+            {
                 label: 'Structured Data',
-                tooltip: 'Structured data (JSON-LD / schema.org markup) tells search engines and AI exactly what your page is about — product, organization, FAQ, etc. It enables rich results in Google (star ratings, FAQ dropdowns) and makes your content more citable by AI systems like ChatGPT and Perplexity. ✓ is good, ✗ is a missed opportunity.',
+                tooltip: 'JSON-LD / schema.org markup. Tells search engines and AI exactly what your page is about — enables rich results in Google and makes content more citable by ChatGPT and Perplexity.',
                 good: (v) => v === '✓',
                 warn: () => false,
                 your: yourSite?.content_analysis?.has_structured_data ? '✓' : '✗',
@@ -529,7 +591,7 @@ class WebsiteScanner {
             },
             {
                 label: 'FAQ Schema',
-                tooltip: 'FAQ schema markup tags your Q&A content so Google can display it as expandable "People Also Ask" results, and so AI assistants (ChatGPT, Gemini, Perplexity) can extract and surface your answers directly. ✓ = implemented, ✗ = missing. Low effort, high visibility impact.',
+                tooltip: 'FAQ schema enables "People Also Ask" rich results in Google and lets AI assistants surface your answers directly. Low effort, high visibility impact.',
                 good: (v) => v === '✓',
                 warn: () => false,
                 your: yourSite?.llm_discoverability?.faq_schema ? '✓' : '✗',
@@ -538,7 +600,7 @@ class WebsiteScanner {
             },
             {
                 label: 'Statistics / Data',
-                tooltip: 'Does the page include specific numbers, percentages, or data points? (e.g. "94% of threats stopped", "10,000 customers"). AI systems strongly prefer citing pages with concrete data over vague claims. ✓ means detectable numbers found, ✗ means the page relies on qualitative language only.',
+                tooltip: 'Specific numbers, percentages, or data points on the page. AI systems strongly prefer citing pages with concrete data. ✗ means the page relies on qualitative claims only.',
                 good: (v) => v === '✓',
                 warn: () => false,
                 your: yourSite?.geo_factors?.statistics_present ? '✓' : '✗',
@@ -547,7 +609,7 @@ class WebsiteScanner {
             },
             {
                 label: 'AI Citation Ready',
-                tooltip: 'A composite score: does the page have statistics AND either expert quotes or multiple lists? Citation-ready content is what AI tools (ChatGPT, Perplexity, Gemini) pull from when answering user questions. ✓ means your page is more likely to be recommended or quoted by AI search engines.',
+                tooltip: 'Composite: does the page have statistics + expert quotes or multiple lists? Citation-ready content is what AI tools pull from when answering user questions.',
                 good: (v) => v === '✓',
                 warn: () => false,
                 your: yourSite?.geo_factors?.citation_ready ? '✓' : '✗',
@@ -555,17 +617,8 @@ class WebsiteScanner {
                 context: () => ''
             },
             {
-                label: 'Comparison Tables',
-                tooltip: 'HTML tables on the page. Tables are extremely effective for winning "X vs Y" and "best [product]" queries — both in featured snippets and AI responses. If a competitor has tables and you don\'t, they have a structural advantage for comparison searches.',
-                good: (v) => v === '✓',
-                warn: () => false,
-                your: yourSite?.geo_factors?.comparison_tables ? '✓' : '✗',
-                comp: (c) => c.geo_factors?.comparison_tables ? '✓' : '✗',
-                context: () => ''
-            },
-            {
                 label: 'Lists / Bullets',
-                tooltip: 'Number of bulleted or numbered lists. Lists are highly scannable for humans and easily extractable by AI. They frequently become featured snippets. Aim for 3+ lists on key pages.',
+                tooltip: 'Number of bulleted or numbered lists. Lists are scannable for humans and easily extractable by AI. They frequently become featured snippets. Aim for 3+.',
                 good: (v) => v >= 3,
                 warn: (v) => v > 0 && v < 3,
                 your: yourSite?.geo_factors?.lists_and_bullets ?? 'N/A',
@@ -573,8 +626,44 @@ class WebsiteScanner {
                 context: () => ''
             },
             {
+                label: 'Comparison Tables',
+                tooltip: 'HTML tables on the page. Highly effective for "X vs Y" and "best [product]" queries in both featured snippets and AI responses.',
+                good: (v) => v === '✓',
+                warn: () => false,
+                your: yourSite?.geo_factors?.comparison_tables ? '✓' : '✗',
+                comp: (c) => c.geo_factors?.comparison_tables ? '✓' : '✗',
+                context: () => ''
+            },
+            {
+                label: 'HTTPS',
+                tooltip: 'Whether the site uses HTTPS. Required for security, trust, and is a Google ranking factor.',
+                good: (v) => v === '✓',
+                warn: () => false,
+                your: yourSite?.technical_factors?.https ? '✓' : '✗',
+                comp: (c) => c.technical_factors?.https ? '✓' : '✗',
+                context: () => ''
+            },
+            {
+                label: 'Sitemap',
+                tooltip: 'A sitemap.xml file helps search engines discover and index all your pages efficiently.',
+                good: (v) => v === '✓',
+                warn: () => false,
+                your: yourSite?.technical_factors?.has_sitemap ? '✓' : '✗',
+                comp: (c) => c.technical_factors?.has_sitemap ? '✓' : '✗',
+                context: () => ''
+            },
+            {
+                label: 'Security Headers',
+                tooltip: 'Number of HTTP security headers present (HSTS, CSP, X-Frame-Options, etc.). Security headers are a trust signal for enterprise buyers and some ranking systems.',
+                good: (v) => v >= 3,
+                warn: (v) => v > 0 && v < 3,
+                your: Object.keys(yourSite?.technical_factors?.security_headers || {}).length,
+                comp: (c) => Object.keys(c.technical_factors?.security_headers || {}).length,
+                context: () => ''
+            },
+            {
                 label: 'Issues Found',
-                tooltip: 'Number of SEO / technical issues detected on the page (missing meta tags, broken alt text, no sitemap, etc.). Fewer is better — this is a rough health indicator. Your own issue list in the "Your Site Analysis" tab has the full details.',
+                tooltip: 'Number of SEO / technical issues detected. Fewer is better. See "Your Site Analysis" tab for the full list.',
                 good: (v) => !isNaN(v) && Number(v) === 0,
                 warn: (v) => !isNaN(v) && Number(v) > 0 && Number(v) <= 3,
                 your: yourSite?.issues?.length ?? 0,
@@ -647,7 +736,7 @@ class WebsiteScanner {
                     <h4 style="margin: 0 0 12px 0; color: var(--olive-green-dark);">${domain}</h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.875rem;">
                         <div>
-                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px;">What they're conveying</div>
+                            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px;">Primary headline (H1)</div>
                             <div style="color: #333;">${msg.primary_message || seo.title || '<em style="color:#aaa">Not detected</em>'}</div>
                         </div>
                         <div>
@@ -710,7 +799,7 @@ class WebsiteScanner {
                             <div class="copy-item"
                                  onclick="navigator.clipboard.writeText(this.dataset.text); this.style.background='#e8f5e9'; setTimeout(() => this.style.background='var(--table-shade)', 1200);"
                                  data-text="${item.replace(/"/g, '&quot;')}"
-                                 style="background: var(--table-shade); padding: 12px; margin-top: 8px; border-radius: 4px; cursor: pointer; font-size: 0.875rem; border-left: 3px solid var(--highlight-3); white-space: pre-wrap;">
+                                 style="background: var(--table-shade); padding: 7px 10px; margin-top: 6px; border-radius: 4px; cursor: pointer; font-size: 0.84rem; line-height: 1.4; border-left: 3px solid var(--highlight-3); white-space: pre-wrap;">
                                 ${item}
                             </div>
                         `).join('')}
@@ -929,12 +1018,10 @@ ${'='.repeat(60)}
     }
 
     filterRecommendations(category) {
-        // Update filter buttons
+        this.activeFilter = category;
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.filter === category);
         });
-
-        // Filter recommendations
         document.querySelectorAll('.recommendation').forEach(rec => {
             if (category === 'all' || rec.dataset.category === category) {
                 rec.style.display = 'block';
@@ -942,6 +1029,32 @@ ${'='.repeat(60)}
                 rec.style.display = 'none';
             }
         });
+    }
+
+    sortRecommendations(sortBy) {
+        this.activeSort = sortBy;
+        document.querySelectorAll('.sort-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.sort === sortBy);
+        });
+
+        const impactOrder = { high: 0, medium: 1, low: 2 };
+        const effortOrder = { low: 0, medium: 1, high: 2 };
+
+        const sorted = [...(this.allRecommendations || [])].sort((a, b) => {
+            if (sortBy === 'impact') {
+                return (impactOrder[a.impact] ?? 1) - (impactOrder[b.impact] ?? 1);
+            } else if (sortBy === 'effort') {
+                return (effortOrder[a.effort] ?? 1) - (effortOrder[b.effort] ?? 1);
+            }
+            return (a.id ?? 0) - (b.id ?? 0); // default: original order
+        });
+
+        this.renderRecommendations(sorted);
+
+        // Re-apply current filter
+        if (this.activeFilter && this.activeFilter !== 'all') {
+            this.filterRecommendations(this.activeFilter);
+        }
     }
 
     resetForm() {

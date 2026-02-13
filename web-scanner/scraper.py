@@ -407,14 +407,18 @@ class WebsiteScraper:
         full_text = soup.get_text(separator=" ", strip=True)
         audience_signals = []
         audience_patterns = [
-            r"for\s+(enterprise|teams?|developers?|security|CTOs?|CISOs?|engineers?|marketers?|executives?|IT\s+\w+)",
-            r"built\s+for\s+([^,.]{5,40})",
-            r"designed\s+for\s+([^,.]{5,40})",
-            r"trusted\s+by\s+([^,.]{5,50})"
+            r"for\s+(enterprise|teams?|developers?|security\s+teams?|CTOs?|CISOs?|engineers?|marketers?|executives?|IT\s+\w+)",
+            r"built\s+for\s+([\w\s]{5,35}?)(?=[,.\n]|$)",
+            r"designed\s+for\s+([\w\s]{5,35}?)(?=[,.\n]|$)",
+            r"trusted\s+by\s+([\w\s]{5,40}?)(?=[,.\n]|$)"
         ]
         for pat in audience_patterns:
             matches = re.findall(pat, full_text, re.I)
-            audience_signals.extend(matches[:2])
+            for m in matches[:2]:
+                cleaned = m.strip().rstrip(".,;")
+                # Keep only short, clean phrases (not sentences)
+                if len(cleaned) < 50 and len(cleaned.split()) <= 6:
+                    audience_signals.append(cleaned)
         if audience_signals:
             messaging["apparent_audience"] = "; ".join(list(dict.fromkeys(audience_signals))[:3])
 
