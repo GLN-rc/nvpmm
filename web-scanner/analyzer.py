@@ -242,7 +242,7 @@ class OptimizationAnalyzer:
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are a senior SEO and content strategist specializing in B2B cybersecurity and enterprise software. You understand both traditional SEO (Google rankings) and AI/GEO discoverability (how ChatGPT, Perplexity, Gemini, and Claude surface and cite pages).
+                        "content": """You are a senior SEO and content strategist specializing in B2B software. You understand both traditional SEO (Google rankings) and AI/GEO discoverability (how ChatGPT, Perplexity, Gemini, and Claude surface and cite pages).
 
 Your recommendations must follow these rules without exception:
 1. BRAND ACCURACY: Use the exact product/brand name from the documents. Never shorten, alter, or genericize it.
@@ -251,7 +251,8 @@ Your recommendations must follow these rules without exception:
 4. REAL SEO PRACTICES: Search intent alignment, semantic keyword clustering, E-E-A-T signals, title/meta optimization using actual page content.
 5. REAL AI DISCOVERABILITY: Direct-answer content formatting, FAQ schema, citation-worthy framing, structured content AI can extract and quote verbatim.
 6. COPY SPECIFICITY: When suggesting copy, write real candidate headlines/titles/descriptions specific to this brand's actual positioning — never use placeholder patterns like "Company X solves Y for Z teams."
-7. COMPETITIVE INSIGHT: Identify where competitors are strong on specific query types and recommend content or structural changes to compete."""
+7. COMPETITIVE INSIGHT: Identify where competitors are strong on specific query types and recommend content or structural changes to compete.
+8. REFLECT THE BRAND'S ACTUAL PRIMARY MESSAGE: Read the brand documents carefully. Use the positioning angles, audience language, and differentiators that are most prominent in those docs — not generic industry buzzwords. If the brand documents don't emphasize a particular term or concept, don't lead with it. Mirror the hierarchy and priorities in the docs."""
                     },
                     {
                         "role": "user",
@@ -304,7 +305,7 @@ Domain: {your_site.get('domain')}
 ### SEO Factors
 - Title: {your_site.get('seo_factors', {}).get('title', 'Not found')}
 - Title Length: {your_site.get('seo_factors', {}).get('title_length', 0)} chars
-- Meta Description: {your_site.get('seo_factors', {}).get('meta_description', 'Not found')[:150]}
+- Meta Description: {(your_site.get('seo_factors', {}).get('meta_description') or 'Not found')[:150]}
 - H1 Tags: {your_site.get('seo_factors', {}).get('h1_tags', [])}
 - Word Count: {your_site.get('seo_factors', {}).get('word_count', 0)}
 - Images without alt: {your_site.get('seo_factors', {}).get('images_without_alt', 0)}
@@ -336,7 +337,8 @@ Domain: {your_site.get('domain')}
 - Competitors with Structured Data: {competitor_summary.get('seo_patterns', {}).get('has_structured_data', 0)}
 - Average Competitor Word Count: {competitor_summary.get('seo_patterns', {}).get('avg_word_count', 0)}
 
-### Competitor Keyword Targets (terms they appear to be optimizing for):
+### Competitor Keyword Targets (terms COMPETITORS appear to be optimizing for):
+NOTE: These are competitor keywords — useful to know for competitive strategy, but do NOT use them as the brand's own positioning language in copy suggestions unless the brand documents also use them.
 {self._format_competitor_keywords(competitors)}
 
 ### Competitor Messaging Angles:
@@ -346,10 +348,10 @@ Domain: {your_site.get('domain')}
 {json.dumps(gaps, indent=2)}
 
 ## Brand & Messaging Documents (uploaded by user)
-These documents define the approved brand voice, product positioning, messaging hierarchy, and approved claims.
-ALL copy suggestions and messaging recommendations MUST align with these documents.
-Use the exact product name, approved value propositions, and approved messaging found here.
-Do NOT invent capabilities, statistics, or positioning not present in these documents.
+CRITICAL: These documents are the ONLY approved source for copy suggestions and brand language.
+The copy suggestions must sound like they came from these docs — not from the competitor analysis above.
+Use the exact product name, approved value propositions, and messaging hierarchy found here.
+If a competitor keyword (e.g. "zero trust", "AI-powered", "next-gen") does NOT appear in these brand docs, do NOT use it in copy suggestions. You may mention it in recommendations as a competitor term to be aware of, but do not put it in the brand's own copy.
 
 {brand_context.get('combined_content', 'No documents uploaded')[:12000]}
 
@@ -449,6 +451,8 @@ COPY SUGGESTIONS RULES — critical:
 - FAQ answers must reflect the actual product capabilities described in the docs
 - Write for the actual audience described in the brand docs (not generic "enterprise teams")
 - Suggestions should be immediately usable — no [placeholder] text unless it's clearly a stat the client needs to fill in from their own data
+- DO NOT default to generic industry buzzwords (e.g. "zero trust", "AI-powered", "next-gen") unless those exact terms are prominent in the brand documents. Use the language the brand actually uses.
+- The copy suggestions should feel like they were written by someone who read every word of the brand docs — not a generic copywriter who knows the product category.
 
 STRICT RECOMMENDATION RULES:
 - Use "AI Discoverability" for all GEO/LLM recommendations (not separate categories)

@@ -69,6 +69,23 @@ class DocumentProcessor:
                 "metadata": {}
             }
 
+    def _fix_pdf_word_joins(self, text: str) -> str:
+        """
+        Fix common PDF extraction artifacts where words on adjacent lines
+        get concatenated without spaces (e.g. "workinstant" → "work instant").
+        Strategy: insert a space before a lowercase letter that immediately
+        follows a lowercase letter when the transition looks like a line-break fusion.
+        We use a conservative regex — only split at camelCase-like boundaries
+        inside what looks like a multi-word run.
+        """
+        import re
+        # Insert space between a lowercase letter followed immediately by an
+        # uppercase letter (catches "workInstant" style fusions from PDFs)
+        text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+        # Collapse multiple spaces
+        text = re.sub(r' {2,}', ' ', text)
+        return text
+
     def _extract_pdf(self, file_path: str) -> tuple[str, dict]:
         """Extract text from PDF files."""
         try:
@@ -85,9 +102,13 @@ class DocumentProcessor:
                     metadata["author"] = reader.metadata.get("/Author", "")
 
                 for page in reader.pages:
-                    text = page.extract_text()
+                    # Try layout mode first (pypdf ≥ 3.1) — preserves spacing better
+                    try:
+                        text = page.extract_text(extraction_mode="layout")
+                    except TypeError:
+                        text = page.extract_text()
                     if text:
-                        content.append(text)
+                        content.append(self._fix_pdf_word_joins(text))
 
             return "\n\n".join(content), metadata
         except ImportError:

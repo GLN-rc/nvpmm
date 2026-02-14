@@ -116,13 +116,13 @@ class WebsiteScraper:
             seo["meta_description"] = meta_desc["content"]
             seo["meta_description_length"] = len(seo["meta_description"])
 
-        # Headings
+        # Headings — use separator=" " to prevent adjacent inline elements merging words
         for h1 in soup.find_all("h1"):
-            seo["h1_tags"].append(h1.get_text(strip=True)[:100])
+            seo["h1_tags"].append(h1.get_text(separator=" ", strip=True)[:100])
         for h2 in soup.find_all("h2"):
-            seo["h2_tags"].append(h2.get_text(strip=True)[:100])
+            seo["h2_tags"].append(h2.get_text(separator=" ", strip=True)[:100])
         for h3 in soup.find_all("h3"):
-            seo["h3_tags"].append(h3.get_text(strip=True)[:100])
+            seo["h3_tags"].append(h3.get_text(separator=" ", strip=True)[:100])
 
         # Canonical
         canonical = soup.find("link", attrs={"rel": "canonical"})
@@ -372,8 +372,9 @@ class WebsiteScraper:
         }
 
         # Grab hero / above-the-fold text: H1, first H2, hero-class elements
-        h1_tags = [t.get_text(strip=True) for t in soup.find_all("h1")]
-        h2_tags = [t.get_text(strip=True) for t in soup.find_all("h2")][:4]
+        # Use separator=" " everywhere to prevent inline elements merging into "wordword"
+        h1_tags = [t.get_text(separator=" ", strip=True) for t in soup.find_all("h1")]
+        h2_tags = [t.get_text(separator=" ", strip=True) for t in soup.find_all("h2")][:4]
 
         # Hero-like containers
         hero_text = []
@@ -389,7 +390,7 @@ class WebsiteScraper:
             messaging["primary_message"] = hero_text[0][:150]
 
         # Value prop — look for subheadline patterns near the hero
-        all_paras = [p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True)) > 40]
+        all_paras = [p.get_text(separator=" ", strip=True) for p in soup.find_all("p") if len(p.get_text(separator=" ", strip=True)) > 40]
         if all_paras:
             messaging["value_proposition"] = all_paras[0][:200]
 
@@ -398,7 +399,7 @@ class WebsiteScraper:
 
         # CTA language
         for el in soup.find_all(["a", "button"]):
-            text = el.get_text(strip=True)
+            text = el.get_text(separator=" ", strip=True)
             if 3 < len(text) < 60:
                 messaging["cta_language"].append(text)
         messaging["cta_language"] = list(dict.fromkeys(messaging["cta_language"]))[:8]
@@ -426,7 +427,7 @@ class WebsiteScraper:
         word_count = len(full_text.split())
         exclamations = full_text.count("!")
         technical_terms = len(re.findall(
-            r"\b(API|SDK|integration|compliance|enterprise|zero.trust|encryption|schema|protocol)\b",
+            r"\b(API|SDK|integration|compliance|enterprise|encryption|schema|protocol|authentication|authorization)\b",
             full_text, re.I
         ))
         if technical_terms > 5:
@@ -437,42 +438,109 @@ class WebsiteScraper:
             messaging["tone"] = "Professional / Corporate"
 
         # ── Keyword targeting signals ─────────────────────────────────────────
-        # Extract the terms this page appears to be optimizing for, by looking at:
-        # title, H1, H2s, meta description, and repeated noun phrases in body text.
-        keyword_signals = []
+        # Extract the meaningful keyword TERMS this page appears to be optimizing for.
+        # Strategy: pull individual important words and known compound terms from the
+        # highest-signal locations (title, H1, H2s, meta). Normalize to lowercase so
+        # the same term from different sites will match when compared in the frontend.
 
-        # Title + H1 words (high-weight SEO signals)
-        title_text = seo_factors.get("title", "") if hasattr(self, '_last_seo') else ""
-        # Pull from soup directly
         title_tag = soup.find("title")
         meta_desc_tag = soup.find("meta", attrs={"name": re.compile(r"description", re.I)})
-        title_raw = title_tag.get_text(strip=True) if title_tag else ""
+        title_raw = title_tag.get_text(separator=" ", strip=True) if title_tag else ""
         meta_raw = meta_desc_tag.get("content", "") if meta_desc_tag else ""
 
-        # Collect candidate keyword phrases from title, h1, h2s
-        candidate_sources = [title_raw, messaging.get("primary_message", "")] + (messaging.get("key_claims") or [])
-        if meta_raw:
-            candidate_sources.append(meta_raw)
+        # Sources in priority order: title (x2 weight), H1, H2s, meta description
+        candidate_sources = (
+            [title_raw, title_raw]  # title counts double — it's the strongest SEO signal
+            + [messaging.get("primary_message", "")]
+            + (messaging.get("key_claims") or [])
+            + ([meta_raw] if meta_raw else [])
+        )
+        full_candidate_text = " ".join(candidate_sources).lower()
 
-        seen = set()
-        for source in candidate_sources:
-            # Extract 2-4 word noun-phrase-like chunks: sequences of cap/lower words
-            phrases = re.findall(r'\b([A-Za-z][a-z]+(?:\s+[A-Za-z][a-z]+){1,3})\b', source)
-            for phrase in phrases:
-                p = phrase.lower().strip()
-                # Filter out stop-phrase-only results
-                stop = {"the", "and", "for", "with", "that", "this", "your", "from", "are", "our", "you", "how"}
-                words = p.split()
-                if len(words) < 2:
-                    continue
-                if all(w in stop for w in words):
-                    continue
-                if p not in seen:
-                    seen.add(p)
-                    keyword_signals.append(phrase.strip())
+        # Known compound keyword terms to detect as single units (checked first)
+        compound_terms = [
+            "zero trust", "zero-trust", "identity and access management", "iam",
+            "privileged access management", "pam", "endpoint detection and response", "edr",
+            "extended detection and response", "xdr", "security information and event management", "siem",
+            "cloud security", "network security", "application security", "data security",
+            "access control", "access management", "identity management", "identity security",
+            "threat detection", "threat intelligence", "threat prevention", "threat response",
+            "incident response", "vulnerability management", "patch management",
+            "risk management", "compliance management", "security posture",
+            "remote access", "secure access", "privileged access", "least privilege",
+            "multi-factor authentication", "mfa", "single sign-on", "sso",
+            "endpoint security", "endpoint protection", "endpoint management",
+            "device management", "mobile device management", "mdm",
+            "data loss prevention", "dlp", "data protection", "data privacy",
+            "ransomware protection", "malware protection", "phishing protection",
+            "security operations", "security automation", "security orchestration",
+            "devsecops", "devops security", "cloud-native", "hybrid cloud",
+            "digital transformation", "workforce security", "remote workforce",
+            "user behavior analytics", "behavioral analytics", "anomaly detection",
+            "ai security", "machine learning security", "security platform",
+            "security solution", "security tool", "security software",
+        ]
 
-        # Deduplicate and keep top 8 most meaningful (prefer shorter, title-sourced)
-        messaging["keyword_targets"] = keyword_signals[:8]
+        # High-value single-word signals worth surfacing on their own
+        single_terms = [
+            "cybersecurity", "microsegmentation", "segmentation", "authentication",
+            "authorization", "encryption", "visibility", "compliance", "governance",
+            "automation", "orchestration", "analytics", "monitoring", "detection",
+            "prevention", "protection", "remediation", "resilience", "posture",
+            "identity", "access", "network", "endpoint", "cloud", "hybrid", "workforce",
+        ]
+
+        # Generic stop words — not useful as keyword signals
+        stop_words = {
+            "the", "and", "for", "with", "that", "this", "your", "from", "are",
+            "our", "you", "how", "more", "get", "all", "can", "will", "has",
+            "have", "its", "not", "but", "was", "they", "them", "their", "been",
+            "into", "about", "when", "which", "what", "who", "also", "just",
+            "most", "any", "new", "use", "one", "two", "help", "make", "need",
+            "work", "time", "way", "see", "now", "only", "over", "than",
+        }
+
+        found_keywords = []
+        seen_kw = set()
+
+        # First pass: detect known compound terms
+        for term in compound_terms:
+            if term in full_candidate_text and term not in seen_kw:
+                seen_kw.add(term)
+                # Use a clean display form (capitalize first letter)
+                found_keywords.append(term.replace("-", " ").title() if len(term) > 4 else term.upper())
+
+        # Second pass: detect high-value single terms
+        for term in single_terms:
+            if re.search(r'\b' + re.escape(term) + r'\b', full_candidate_text) and term not in seen_kw:
+                seen_kw.add(term)
+                found_keywords.append(term.capitalize())
+
+        # Third pass: any remaining 2-word phrases from title/H1 that aren't stop words
+        # (catches brand-specific terms not in our lists)
+        title_h1_text = (title_raw + " " + messaging.get("primary_message", "")).lower()
+        two_word_phrases = re.findall(r'\b([a-z]+\s+[a-z]+)\b', title_h1_text)
+        for phrase in two_word_phrases:
+            words = phrase.split()
+            if phrase in seen_kw:
+                continue
+            # Skip if any word is a stop word
+            if any(w in stop_words for w in words):
+                continue
+            # Skip repeated words (e.g. "okta okta")
+            if words[0] == words[1]:
+                continue
+            # Skip if either word is too short to be meaningful
+            if any(len(w) < 4 for w in words):
+                continue
+            # Skip if it looks like a gerund/verb phrase starting with a verb-like word
+            if words[0].endswith(('ing', 'ures', 'ets', 'sts', 'nds')):
+                continue
+            seen_kw.add(phrase)
+            found_keywords.append(phrase.title())
+
+        # Keep top 10, prioritizing compound terms (they appear first)
+        messaging["keyword_targets"] = found_keywords[:10]
 
         return messaging
 
@@ -544,6 +612,27 @@ class WebsiteScraper:
 
         if not geo.get("citation_ready"):
             issues.append({"category": "GEO", "severity": "medium", "issue": "Content not optimized for AI citations"})
+
+        # Content rendering / text quality issues
+        # Detect fused words — adjacent inline elements with no space separator
+        # e.g. "workinstant" from <span>work</span><span>instant</span>
+        h1_text = " ".join(result.get("seo_factors", {}).get("h1_tags", []))
+        h2_text = " ".join(result.get("seo_factors", {}).get("h2_tags", []))
+        headings_text = h1_text + " " + h2_text
+        # Look for suspiciously long all-lowercase runs (8+ chars) with no space — likely fused words
+        fused_matches = re.findall(r'\b[a-z]{9,}\b', headings_text)
+        # Exclude real long words
+        real_long_words = {"enterprise", "organization", "technology", "management", "performance",
+                           "compliance", "integration", "application", "protection", "understand",
+                           "cybersecurity", "intelligence", "infrastructure", "configuration",
+                           "automatically", "implementation"}
+        fused_suspects = [w for w in fused_matches if w not in real_long_words]
+        if fused_suspects:
+            issues.append({
+                "category": "Content",
+                "severity": "medium",
+                "issue": f"Possible fused/missing-space words in headings (e.g. '{fused_suspects[0]}'). This is a rendering or CMS issue where adjacent text elements are not separated by spaces. Affects readability and SEO."
+            })
 
         # Strengths
         if seo.get("title") and 30 <= seo.get("title_length", 0) <= 60:

@@ -55,6 +55,7 @@ class AnalysisResponse(BaseModel):
     your_site_analysis: dict
     competitor_analyses: list[dict]
     recommendations: list[dict]
+    copy_suggestions: list[dict] = []
     priority_actions: list[dict]
 
 

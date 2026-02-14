@@ -737,3 +737,7 @@ footer {
 .mt-lg { margin-top: var(--spacing-lg); }
 .mb-lg { margin-bottom: var(--spacing-lg); }
 .hidden { display: none !important; }
+
+/* Copy suggestion flash feedback */
+.copy-item { transition: background 0.15s ease; }
+.copy-item.copy-flash { background: #e8e4ef !important; } /* Pale plum — from palette */

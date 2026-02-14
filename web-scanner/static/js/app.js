@@ -397,29 +397,129 @@ class WebsiteScanner {
             `;
         }
 
+        // Scannability scoring helpers
+        const h2Count = seo.h2_tags?.length || 0;
+        const h3Count = seo.h3_tags?.length || 0;
+        const wordCount = seo.word_count || 0;
+        const listCount = geo.lists_and_bullets || 0;
+        const imgTotal = seo.images_total || 0;
+        const imgBad = seo.images_without_alt || 0;
+        const internalLinks = seo.internal_links || 0;
+        const externalLinks = seo.external_links || 0;
+        const titleLen = seo.title_length || 0;
+        const metaLen = seo.meta_description_length || 0;
+        const secHeaders = Object.keys(tech.security_headers || {}).length;
+
+        // Reading time estimate (avg 200 words/min)
+        const readingMins = wordCount > 0 ? Math.ceil(wordCount / 200) : 0;
+
+        // Scannability score out of 5
+        let scanScore = 0;
+        if (h2Count >= 3) scanScore++;
+        if (listCount >= 2) scanScore++;
+        if (wordCount >= 400 && wordCount <= 2500) scanScore++;
+        if (imgTotal >= 2) scanScore++;
+        if (h3Count >= 2) scanScore++;
+        const scanLabel = scanScore >= 4 ? ['Highly scannable', 'good'] : scanScore >= 2 ? ['Moderately scannable', 'warning'] : ['Hard to scan', 'bad'];
+
+        // Word count context
+        const wordCtx = wordCount < 300 ? ['Too short — add more content', 'bad']
+            : wordCount <= 800 ? ['Good for a homepage', 'good']
+            : wordCount <= 2000 ? ['Good depth for a landing page', 'good']
+            : ['Very long — consider splitting', 'warning'];
+
+        // Title length context
+        const titleCtx = titleLen >= 30 && titleLen <= 60 ? ['Optimal (30–60 chars)', 'good']
+            : titleLen > 60 ? ['Too long — may truncate in search', 'warning']
+            : titleLen > 0 ? ['Too short — add more context', 'warning']
+            : ['Missing', 'bad'];
+
+        // Meta description context
+        const metaCtx = metaLen >= 120 && metaLen <= 160 ? ['Optimal (120–160 chars)', 'good']
+            : metaLen > 160 ? ['Too long — may truncate', 'warning']
+            : metaLen > 0 ? ['Too short — aim for 120–160 chars', 'warning']
+            : ['Missing', 'bad'];
+
+        // Image alt coverage
+        const altCoverage = imgTotal > 0 ? Math.round(((imgTotal - imgBad) / imgTotal) * 100) : 100;
+        const altCtx = altCoverage === 100 ? ['100% — all images have alt text', 'good']
+            : altCoverage >= 80 ? [`${altCoverage}% — a few images missing alt`, 'warning']
+            : [`${altCoverage}% — many images missing alt text`, 'bad'];
+
         // Metrics cards
         metricsContainer.innerHTML = messagingHtml + insightsHtml + `
+
+            <div class="analysis-card" style="grid-column: 1 / -1; border-left: 4px solid var(--highlight-2);">
+                <h4 style="color: var(--highlight-2); margin-bottom: 14px;">Scannability &amp; Content Structure</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">Scannability</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;" class="${scanLabel[1]}">${scanLabel[0]}</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">${scanScore}/5 signals present</div>
+                    </div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">Word Count</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;">${wordCount.toLocaleString()}</div>
+                        <div style="font-size: 0.75rem; margin-top: 2px;" class="${wordCtx[1]}">${wordCtx[0]}</div>
+                    </div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">Est. Reading Time</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;">${readingMins > 0 ? readingMins + ' min' : '< 1 min'}</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">At 200 words/min</div>
+                    </div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">H2 Sections</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;" class="${h2Count >= 3 ? 'good' : h2Count > 0 ? 'warning' : 'bad'}">${h2Count}</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Aim for 3+ sections</div>
+                    </div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">H3 Subsections</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;">${h3Count}</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Depth within each section</div>
+                    </div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">Lists / Bullets</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;" class="${listCount >= 2 ? 'good' : listCount > 0 ? 'warning' : 'bad'}">${listCount}</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Scannable + AI-extractable</div>
+                    </div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">Images</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;">${imgTotal}</div>
+                        <div style="font-size: 0.75rem; margin-top: 2px;" class="${altCtx[1]}">${altCtx[0]}</div>
+                    </div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">Internal Links</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;" class="${internalLinks >= 10 ? 'good' : internalLinks > 0 ? 'warning' : 'bad'}">${internalLinks}</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Aim for 10+ for SEO</div>
+                    </div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">External Links</div>
+                        <div style="font-size: 1.05rem; font-weight: 700;" class="${externalLinks >= 2 ? 'good' : externalLinks > 0 ? 'warning' : 'bad'}">${externalLinks}</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Cite sources for E-E-A-T</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="analysis-card">
                 <h4>SEO Factors</h4>
                 <div class="metric">
-                    <span class="metric-label">Title Length</span>
-                    <span class="metric-value ${seo.title_length >= 30 && seo.title_length <= 60 ? 'good' : 'warning'}">${seo.title_length || 0} chars</span>
+                    <span class="metric-label">Title</span>
+                    <span class="metric-value ${titleCtx[1]}" style="font-size:0.82rem;">${titleCtx[0]}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label" style="font-size:0.78rem; color:#888;">${seo.title ? '"' + seo.title.slice(0,50) + (seo.title.length > 50 ? '…' : '') + '"' : ''}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Meta Description</span>
-                    <span class="metric-value ${seo.meta_description_length >= 120 && seo.meta_description_length <= 160 ? 'good' : 'warning'}">${seo.meta_description_length || 0} chars</span>
+                    <span class="metric-value ${metaCtx[1]}" style="font-size:0.82rem;">${metaCtx[0]}</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">H1 Tags</span>
-                    <span class="metric-value ${(seo.h1_tags?.length || 0) === 1 ? 'good' : 'warning'}">${seo.h1_tags?.length || 0}</span>
+                    <span class="metric-value ${(seo.h1_tags?.length || 0) === 1 ? 'good' : 'warning'}">${seo.h1_tags?.length || 0} <span style="font-size:0.75rem;color:#888;">(ideal: 1)</span></span>
                 </div>
                 <div class="metric">
-                    <span class="metric-label">Word Count</span>
-                    <span class="metric-value">${seo.word_count || 0}</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Images Missing Alt</span>
-                    <span class="metric-value ${(seo.images_without_alt || 0) === 0 ? 'good' : 'warning'}">${seo.images_without_alt || 0}</span>
+                    <span class="metric-label">Structured Data</span>
+                    <span class="metric-value ${analysis.content_analysis?.has_structured_data ? 'good' : 'warning'}">${analysis.content_analysis?.has_structured_data ? 'Yes' : 'No'}</span>
                 </div>
             </div>
 
@@ -440,6 +540,10 @@ class WebsiteScanner {
                 <div class="metric">
                     <span class="metric-label">Mobile Viewport</span>
                     <span class="metric-value ${tech.mobile_friendly_hints?.length > 0 ? 'good' : 'bad'}">${tech.mobile_friendly_hints?.length > 0 ? 'Yes' : 'No'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Security Headers</span>
+                    <span class="metric-value ${secHeaders >= 3 ? 'good' : secHeaders > 0 ? 'warning' : 'bad'}">${secHeaders} / 6</span>
                 </div>
             </div>
 
@@ -725,15 +829,18 @@ class WebsiteScanner {
             </div>
         `;
 
-        // Competitor blurbs
-        const blurbsHtml = competitors.map(c => {
-            if (c.status !== 'success') return '';
-            const msg = c.page_messaging || {};
-            const seo = c.seo_factors || {};
-            const domain = c.domain || c.url || 'Competitor';
+        // Helper to render a messaging blurb card for any site
+        const renderBlurb = (site, isYours = false) => {
+            if (site.status !== 'success' && !isYours) return '';
+            const msg = site.page_messaging || {};
+            const seo = site.seo_factors || {};
+            const domain = isYours ? (site.domain || site.url || 'Your Site') : (site.domain || site.url || 'Competitor');
+            const borderColor = isYours ? 'var(--headline)' : 'var(--grey-light)';
+            const headerColor = isYours ? 'var(--headline)' : 'var(--olive-green-dark)';
+            const badge = isYours ? `<span style="font-size:0.7rem; background: var(--headline); color: white; padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle;">Your Site</span>` : '';
             return `
-                <div style="background: white; border: 1px solid var(--grey-light); border-radius: 8px; padding: 20px; margin-top: 16px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--olive-green-dark);">${domain}</h4>
+                <div style="background: white; border: 1px solid ${borderColor}; border-radius: 8px; padding: 20px; margin-top: 16px; ${isYours ? 'border-left: 4px solid var(--headline);' : ''}">
+                    <h4 style="margin: 0 0 12px 0; color: ${headerColor};">${domain}${badge}</h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.875rem;">
                         <div>
                             <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 3px;">Primary headline (H1)</div>
@@ -769,12 +876,79 @@ class WebsiteScanner {
                     </div>
                 </div>
             `;
-        }).join('');
+        };
+
+        const blurbsHtml = renderBlurb(yourSite, true) + competitors.map(c => renderBlurb(c, false)).join('');
+
+        // Competitor keyword intelligence panel
+        // Aggregate all competitor keywords with source labels — for strategic awareness only
+        const kwByCompetitor = competitors
+            .filter(c => c.status === 'success' && c.page_messaging?.keyword_targets?.length > 0)
+            .map(c => ({
+                domain: c.domain || c.url || 'Competitor',
+                keywords: c.page_messaging.keyword_targets
+            }));
+
+        // Collect all unique keywords with a count of how many competitors use them
+        const kwFreq = {};
+        kwByCompetitor.forEach(({ domain, keywords }) => {
+            keywords.forEach(kw => {
+                const k = kw.toLowerCase();
+                if (!kwFreq[k]) kwFreq[k] = { display: kw, sources: [] };
+                kwFreq[k].sources.push(domain);
+            });
+        });
+        const sortedKws = Object.values(kwFreq).sort((a, b) => b.sources.length - a.sources.length);
+
+        // Your site's own keyword targets (for comparison)
+        const yourKws = yourSite?.page_messaging?.keyword_targets || [];
+
+        const kwIntelHtml = sortedKws.length > 0 ? `
+            <div style="background: white; border: 1px solid var(--grey-light); border-radius: 8px; padding: 20px; margin-top: 24px;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 8px;">
+                    <h4 style="margin: 0; color: var(--headline);">Competitor Keyword Intelligence</h4>
+                    <span style="font-size: 0.72rem; background: var(--table-shade); color: var(--highlight-2); border: 1px solid var(--highlight-2); padding: 2px 10px; border-radius: 10px; font-weight: 600; letter-spacing: 0.03em;">For awareness only — not your copy</span>
+                </div>
+                <p style="font-size: 0.82rem; color: #888; margin: 0 0 16px 0; line-height: 1.5;">
+                    These are the keyword phrases your competitors appear to be optimizing for — sourced from their titles, H1s, H2s, and meta descriptions.
+                    Knowing this helps you understand what search real estate they're targeting. Use it to decide where to <strong>compete</strong>, where to <strong>differentiate</strong>, or where to <strong>flank</strong> — but your copy should still use <em>your</em> brand's language.
+                </p>
+
+                ${yourKws.length > 0 ? `
+                <div style="margin-bottom: 14px; padding: 10px 14px; background: var(--table-shade); border-radius: 6px; border-left: 3px solid var(--headline);">
+                    <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--headline); font-weight: 700; margin-bottom: 6px;">Your site's current keyword signals</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        ${yourKws.map(kw => `<span style="background: var(--headline); color: white; padding: 2px 10px; border-radius: 10px; font-size: 0.78rem; font-weight: 500;">${kw}</span>`).join('')}
+                    </div>
+                </div>` : ''}
+
+                <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 8px; font-weight: 600;">Competitor keywords — sorted by how many competitors use them</div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    ${sortedKws.map(kw => {
+                        const usedByAll = kw.sources.length === kwByCompetitor.length && kwByCompetitor.length > 1;
+                        const isShared = kw.sources.length > 1;
+                        return `
+                        <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--table-shade); border-radius: 5px; flex-wrap: wrap;">
+                            <span style="font-size: 0.84rem; font-weight: 600; color: var(--body-text); min-width: 160px;">${kw.display}</span>
+                            <div style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1;">
+                                ${kw.sources.map(s => `<span style="font-size: 0.72rem; background: white; border: 1px solid var(--grey-light); color: #666; padding: 1px 8px; border-radius: 8px;">${s}</span>`).join('')}
+                            </div>
+                            ${usedByAll ? `<span style="font-size: 0.7rem; background: #fdecea; color: #c0392b; padding: 1px 8px; border-radius: 8px; font-weight: 600; white-space: nowrap;">All competitors</span>` :
+                              isShared ? `<span style="font-size: 0.7rem; background: #fff4e0; color: #b8860b; padding: 1px 8px; border-radius: 8px; font-weight: 600; white-space: nowrap;">${kw.sources.length} competitors</span>` : ''}
+                        </div>`;
+                    }).join('')}
+                </div>
+                <p style="font-size: 0.78rem; color: #aaa; margin: 12px 0 0 0; font-style: italic;">
+                    Keywords used by multiple competitors signal high-competition queries. Keywords used by only one competitor may represent an opportunity to outflank them on a less-contested term.
+                </p>
+            </div>
+        ` : '';
 
         container.innerHTML = tableHtml + `
-            <h4 style="margin: 28px 0 4px; color: var(--olive-green-dark);">Competitor Messaging Breakdown</h4>
-            <p style="font-size: 0.85rem; color: #888; margin-bottom: 0;">What each competitor is trying to say, who they're talking to, and the value prop a visitor would walk away with.</p>
+            <h4 style="margin: 28px 0 4px; color: var(--olive-green-dark);">Messaging Breakdown</h4>
+            <p style="font-size: 0.85rem; color: #888; margin-bottom: 0;">What each site is trying to say, who they're talking to, and the value prop a visitor would walk away with.</p>
             ${blurbsHtml}
+            ${kwIntelHtml}
         `;
     }
 
@@ -782,25 +956,40 @@ class WebsiteScanner {
         const container = document.getElementById('copy-suggestions-list');
         if (!container) return;
 
+        // Format a suggestion item — detect Q:/A: pattern and render as structured QA
+        const formatSuggestionItem = (item) => {
+            const qMatch = item.match(/^Q:\s*(.+?)\n+A:\s*([\s\S]+)$/);
+            if (qMatch) {
+                return `
+                    <div style="margin-bottom: 3px;">
+                        <div style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--highlight-2); font-weight: 700; margin-bottom: 2px;">Q</div>
+                        <div style="font-size: 0.84rem; font-weight: 600; color: var(--headline); margin-bottom: 6px;">${qMatch[1]}</div>
+                        <div style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--highlight-3); font-weight: 700; margin-bottom: 2px;">A</div>
+                        <div style="font-size: 0.84rem; color: var(--body-text); line-height: 1.5;">${qMatch[2]}</div>
+                    </div>`;
+            }
+            return `<div style="font-size: 0.84rem; line-height: 1.5; color: var(--body-text);">${item}</div>`;
+        };
+
         // If LLM returned brand-accurate copy suggestions, use those
         if (copySuggestions && copySuggestions.length > 0) {
             container.innerHTML = copySuggestions.map(s => `
-                <div style="background: white; border: 1px solid var(--grey-light); border-radius: 8px; padding: 20px; margin-bottom: 15px;">
-                    <h4 style="color: var(--headline); margin-bottom: 10px;">${s.category}</h4>
+                <div style="background: white; border: 1px solid var(--grey-light); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px;">
+                    <h4 style="color: var(--headline); margin: 0 0 8px 0; font-size: 0.95rem;">${s.category}</h4>
                     ${s.current ? `
-                    <div style="background: var(--table-shade); padding: 10px; border-radius: 4px; margin-bottom: 12px; font-size: 0.85rem;">
+                    <div style="background: var(--table-shade); padding: 7px 10px; border-radius: 4px; margin-bottom: 8px; font-size: 0.82rem;">
                         <strong>Current:</strong> <span style="color: var(--body-text);">${s.current}</span>
                     </div>` : ''}
                     ${s.why ? `
-                    <p style="font-size: 0.82rem; color: var(--grey-medium); margin-bottom: 10px; border-left: 3px solid var(--table-border); padding-left: 8px;"><em>Why this matters:</em> ${s.why}</p>` : ''}
-                    <div style="margin-top: 10px;">
-                        <strong style="font-size: 0.82rem; color: var(--body-text);">Suggested copy (click to copy):</strong>
+                    <p style="font-size: 0.8rem; color: var(--grey-medium); margin: 0 0 8px 0; border-left: 3px solid var(--table-border); padding-left: 8px; line-height: 1.4;"><em>${s.why}</em></p>` : ''}
+                    <div style="margin-top: 6px;">
+                        <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 5px;">Suggested copy — click to copy</div>
                         ${(s.suggestions || []).map(item => `
                             <div class="copy-item"
-                                 onclick="navigator.clipboard.writeText(this.dataset.text); this.style.background='#e8f5e9'; setTimeout(() => this.style.background='var(--table-shade)', 1200);"
+                                 onclick="navigator.clipboard.writeText(this.dataset.text); this.classList.add('copy-flash'); setTimeout(() => this.classList.remove('copy-flash'), 1000);"
                                  data-text="${item.replace(/"/g, '&quot;')}"
-                                 style="background: var(--table-shade); padding: 7px 10px; margin-top: 6px; border-radius: 4px; cursor: pointer; font-size: 0.84rem; line-height: 1.4; border-left: 3px solid var(--highlight-3); white-space: pre-wrap;">
-                                ${item}
+                                 style="background: var(--table-shade); padding: 8px 10px; margin-top: 5px; border-radius: 4px; cursor: pointer; border-left: 3px solid var(--highlight-3);">
+                                ${formatSuggestionItem(item)}
                             </div>
                         `).join('')}
                     </div>
