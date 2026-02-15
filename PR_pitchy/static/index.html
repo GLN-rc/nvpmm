@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PR Pitchy — AI PR Pitch Generator</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+<header class="app-header">
+    <div>
+        <h1>PR Pitchy <span class="tagline">— AI-powered media pitch generator</span></h1>
+    </div>
+</header>
+
+<div class="app-body">
+
+    <!-- Input Panel -->
+    <div class="input-panel">
+        <h2>What are you pitching?</h2>
+        <div class="input-grid">
+
+            <div class="field-group">
+                <label>News / Announcement</label>
+                <span class="hint">Upload the announcement, press release, survey data, research report, partnership details — anything describing what happened.</span>
+                <div class="upload-zone" id="news-zone">
+                    <input type="file" id="news-files" multiple accept=".pdf,.docx,.doc,.txt,.md">
+                    <div class="upload-icon">📰</div>
+                    <div class="upload-label"><strong>Click to upload</strong> or drag files here</div>
+                    <div class="upload-label" style="font-size:0.7rem; margin-top:4px;">PDF, DOCX, TXT — one or many</div>
+                </div>
+                <div class="file-list" id="news-file-list"></div>
+            </div>
+
+            <div class="field-group">
+                <label>Brand &amp; Messaging Docs</label>
+                <span class="hint">Upload your messaging guide, sales deck, positioning doc, or any doc describing your brand voice and product.</span>
+                <div class="upload-zone" id="brand-zone">
+                    <input type="file" id="brand-files" multiple accept=".pdf,.docx,.doc,.txt,.md">
+                    <div class="upload-icon">📋</div>
+                    <div class="upload-label"><strong>Click to upload</strong> or drag files here</div>
+                    <div class="upload-label" style="font-size:0.7rem; margin-top:4px;">PDF, DOCX, TXT — one or many</div>
+                </div>
+                <div class="file-list" id="brand-file-list"></div>
+            </div>
+
+            <div class="field-group full-width">
+                <label>Additional Context <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:#888;">(optional)</span></label>
+                <span class="hint">Paste any extra notes — goals for this PR push, target audience, timing, embargo date, or anything the AI should know.</span>
+                <textarea id="extra-context" rows="3" placeholder="e.g. 'Targeting CISOs at mid-market financial firms. Announcement goes live March 15. We have exclusive data we can offer to one outlet.'"></textarea>
+            </div>
+
+            <div class="field-group">
+                <label>Publication Tier</label>
+                <span class="hint">Tier 1 = top-tier trade press only. Tier 1+2 = all publications including specialist outlets.</span>
+                <div class="tier-selector">
+                    <button class="tier-btn" data-tier="1">Tier 1 only<br><span style="font-size:0.7rem; opacity:0.7;">TechCrunch, Dark Reading, Wired...</span></button>
+                    <button class="tier-btn active" data-tier="2">Tier 1 + 2<br><span style="font-size:0.7rem; opacity:0.7;">All publications</span></button>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="submit-row">
+            <button class="btn-primary" id="analyze-btn" onclick="app.analyze()">
+                Generate Pitches
+            </button>
+            <span class="status-msg" id="status-msg"></span>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section" id="results-section">
+
+        <!-- Stats bar -->
+        <div class="stats-bar" id="stats-bar"></div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="app.switchTab('assessment')">📊 News Assessment</button>
+            <button class="tab-btn" onclick="app.switchTab('targets')">🎯 Pitch Targets</button>
+            <button class="tab-btn" onclick="app.switchTab('publications')">📰 Publication Library</button>
+        </div>
+
+        <!-- Tab: News Assessment -->
+        <div class="tab-panel active" id="tab-assessment">
+            <div id="assessment-content"></div>
+        </div>
+
+        <!-- Tab: Pitch Targets -->
+        <div class="tab-panel" id="tab-targets">
+            <div class="section-header">Prioritized Pitch Targets</div>
+            <div class="section-sub">Sorted by fit score. Expand any target to see the angle, rationale, recent coverage, and a draft pitch email.</div>
+            <div class="targets-list" id="targets-list"></div>
+        </div>
+
+        <!-- Tab: Publication Library -->
+        <div class="tab-panel" id="tab-publications">
+            <div class="section-header">Publication Library</div>
+            <div class="section-sub">The curated list of publications this tool monitors and pitches to.</div>
+            <div id="publications-list"></div>
+        </div>
+
+    </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
