@@ -1,54 +1,97 @@
 """
 PR Pitcher Module
-Uses LLM to analyze news content, assess newsworthiness,
-identify best-fit publications and angles, draft a structured
-multi-wave PR campaign with contingency guidance.
+Two-step pipeline:
+  Step 1 (analyze_and_plan): analyze news + match publications + plan waves → return for user selection
+  Step 2 (draft_campaign): accept user selections + scraped articles → draft personalized pitches
 """
 
 import asyncio
 import os
 import json
+from typing import Optional
 import litellm
 
 
 class PRPitcher:
-    """AI-powered PR pitch generator with campaign wave structure."""
+    """AI-powered PR pitch generator with two-step campaign builder."""
 
     def __init__(self):
         self.model = os.getenv("LLM_MODEL", "gpt-4o")
 
-    async def analyze_and_pitch(
+    # ═══════════════════════════════════════════════════
+    # STEP 1: Analyze news + match pubs + plan waves
+    # Called by /api/analyze — returns targets for user selection
+    # ═══════════════════════════════════════════════════
+
+    async def analyze_and_plan(
         self,
         brand_context: str,
         news_content: str,
+        user_constraints: str,
         publication_summaries: list[dict],
         recent_headlines: list[dict],
     ) -> dict:
         """
-        Full pipeline:
-        1. Analyze the news — what is it, who cares, why now, exclusive viability
-        2. Score each publication for fit + wave suitability + known authors
-        3. Plan campaign waves — assign outlets to Wave 1/2/3 with contingencies
-        4. Draft personalized pitches per wave, parallelized
+        Steps 1-3 only. Does NOT draft pitches.
+        Returns news_analysis, ranked targets with audience_hook, and campaign wave suggestions.
         """
+        news_analysis = await self._analyze_news(brand_context, news_content, user_constraints)
 
-        # Step 1: Analyze the news
-        news_analysis = await self._analyze_news(brand_context, news_content)
-
-        # Step 2: Match and score publications
         targets = await self._match_publications(
-            brand_context, news_analysis, publication_summaries, recent_headlines
+            brand_context, news_analysis, user_constraints, publication_summaries, recent_headlines
         )
 
-        # Step 3: Plan campaign wave structure
-        campaign_plan = await self._plan_campaign(news_analysis, targets)
+        campaign_suggestion = await self._suggest_waves(news_analysis, targets, user_constraints)
 
-        # Build lookup dict for fast target retrieval by pub name
+        return {
+            "news_analysis": news_analysis,
+            "targets": targets,
+            "campaign_suggestion": campaign_suggestion,
+        }
+
+    # ═══════════════════════════════════════════════════
+    # STEP 2: Draft campaign from user selections
+    # Called by /api/campaign — drafts pitches with scraped article context
+    # ═══════════════════════════════════════════════════
+
+    async def draft_campaign(
+        self,
+        brand_context: str,
+        news_content: str,
+        user_constraints: str,
+        news_analysis: dict,
+        targets: list[dict],
+        wave_1_pub: Optional[str],
+        wave_2_pubs: list[str],
+        wave_3_pubs: list[str],
+        scraped_by_pub: dict,     # pub_name → list of scraped article dicts
+        launch_date: str = "",    # e.g. "2025-04-15", optional
+    ) -> dict:
+        """
+        Draft personalized pitches for user-selected publications.
+        Enriches each target with scraped article content before drafting.
+        Runs press release drafting in parallel with pitch drafting.
+        """
         targets_lookup = {t["publication"]: t for t in targets}
 
-        # Step 4: Draft pitches per wave (Wave 2 + 3 in parallel)
-        waves = await self._draft_pitches_by_wave(
-            brand_context, news_analysis, campaign_plan, targets_lookup
+        # Build campaign_plan structure compatible with _draft_pitches_by_wave
+        campaign_plan = await self._plan_campaign_from_selections(
+            news_analysis, targets_lookup, wave_1_pub, wave_2_pubs, wave_3_pubs,
+            user_constraints, launch_date
+        )
+
+        # Enrich targets with scraped article content
+        for pub_name, target in targets_lookup.items():
+            target["scraped_articles"] = scraped_by_pub.get(pub_name, [])
+
+        # Run pitch drafting + press release drafting in parallel
+        waves, press_release = await asyncio.gather(
+            self._draft_pitches_by_wave(
+                brand_context, news_analysis, user_constraints, campaign_plan, targets_lookup
+            ),
+            self._draft_press_release(
+                brand_context, news_content, user_constraints, news_analysis, campaign_plan, launch_date
+            ),
         )
 
         return {
@@ -56,19 +99,27 @@ class PRPitcher:
             "campaign_plan": campaign_plan,
             "waves": waves,
             "all_targets": targets,
+            "press_release": press_release,
         }
 
     # ─────────────────────────────────────────────
-    # STEP 1: Analyze the news
+    # STEP 1a: Analyze the news
     # ─────────────────────────────────────────────
 
-    async def _analyze_news(self, brand_context: str, news_content: str) -> dict:
-        """Analyze submitted news/announcement — classify, assess, identify angles and exclusive viability."""
+    async def _analyze_news(
+        self, brand_context: str, news_content: str, user_constraints: str
+    ) -> dict:
+        """Analyze news — classify, assess newsworthiness, identify angles and exclusive viability."""
+
+        constraints_block = f"""
+## User Constraints (HARD RULES — these override all LLM defaults)
+{user_constraints}
+""" if user_constraints.strip() else ""
 
         prompt = f"""You are a senior PR strategist with deep experience in B2B tech and cybersecurity media relations.
 
 Analyze the following news/announcement and brand context. Read the ENTIRE content carefully — recommendations, data findings, and conclusions at the end are just as important as the opening.
-
+{constraints_block}
 ## Brand Context
 {brand_context}
 
@@ -86,7 +137,7 @@ Return JSON with this exact structure:
   "why_now": "What current trend, event, or market moment makes this timely? If nothing, say so honestly.",
   "who_cares": ["Audience segment 1", "Audience segment 2", "Audience segment 3"],
   "core_story": "The single most compelling story here in 1-2 sentences — the version a journalist would want to tell",
-  "data_assets": ["Any specific stats, numbers, percentages, or research findings worth highlighting in pitches — quote them exactly", "..."],
+  "data_assets": ["Specific stats, numbers, percentages verbatim — quote them exactly as they appear in the content", "..."],
   "angles": [
     {{
       "angle_name": "Short name for this angle",
@@ -97,10 +148,10 @@ Return JSON with this exact structure:
   "weaknesses": ["What's missing that would make this more pitchable", "..."],
   "exclusive_viability": {{
     "can_offer_exclusive": true,
-    "what_to_offer": "Specific thing you can offer one outlet that others won't get — e.g. 'full raw dataset before public release', 'CEO interview 48 hours before launch', 'embargoed draft report with analyst commentary'. Be specific. null if nothing credible to offer.",
-    "embargo_window_suggested": "e.g. '48 hours before launch' or '72 hours' or null if no embargo recommended"
+    "what_to_offer": "Specific thing you can offer one outlet that others won't get. Be concrete. null if nothing credible.",
+    "embargo_window_suggested": "e.g. '48 hours before launch' or null"
   }},
-  "campaign_timing_notes": "Any notes about timing that should influence wave structure — e.g. 'tied to an industry event', 'data is evergreen', 'announcement is time-sensitive due to upcoming regulation enforcement date'",
+  "campaign_timing_notes": "Any timing considerations that should influence campaign structure",
   "companion_content_needed": {{
     "press_release": true,
     "data_exclusive": true,
@@ -110,9 +161,8 @@ Return JSON with this exact structure:
   }}
 }}
 
-Be honest about newsworthiness. A score of 4 or below means this needs more work before pitching.
-Angles should be genuinely distinct — different framings that would appeal to different journalist beats.
-data_assets should include the actual numbers/stats verbatim so they can be dropped directly into pitches.
+Be honest about newsworthiness. Score of 4 or below means story needs more work.
+data_assets should include actual verbatim numbers/stats so they can be dropped directly into pitches.
 """
 
         try:
@@ -126,45 +176,43 @@ data_assets should include the actual numbers/stats verbatim so they can be drop
             return json.loads(response.choices[0].message.content)
         except Exception as e:
             return {
-                "headline": "Analysis failed",
-                "news_type": "Unknown",
+                "headline": "Analysis failed", "news_type": "Unknown",
                 "newsworthiness_score": 0,
                 "newsworthiness_reasoning": f"Error: {str(e)}",
-                "why_now": "",
-                "who_cares": [],
-                "core_story": "",
-                "data_assets": [],
-                "angles": [],
-                "weaknesses": ["LLM analysis failed — check API key and try again"],
+                "why_now": "", "who_cares": [], "core_story": "",
+                "data_assets": [], "angles": [],
+                "weaknesses": ["LLM analysis failed — check API key"],
                 "exclusive_viability": {"can_offer_exclusive": False, "what_to_offer": None, "embargo_window_suggested": None},
-                "campaign_timing_notes": "",
-                "companion_content_needed": {}
+                "campaign_timing_notes": "", "companion_content_needed": {}
             }
 
     # ─────────────────────────────────────────────
-    # STEP 2: Match publications
+    # STEP 1b: Match and score publications
     # ─────────────────────────────────────────────
 
     async def _match_publications(
         self,
         brand_context: str,
         news_analysis: dict,
+        user_constraints: str,
         publication_summaries: list[dict],
         recent_headlines: list[dict],
     ) -> list[dict]:
-        """Score each publication for fit, wave suitability, and surface known authors."""
+        """Score each publication for fit. Generate audience_hook per outlet."""
 
-        # Build headlines and authors per publication
         headlines_by_pub = {}
         authors_by_pub = {}
+        articles_by_pub = {}  # full article objects for later scraping
         for article in recent_headlines:
             pub = article["publication"]
             if pub not in headlines_by_pub:
                 headlines_by_pub[pub] = []
                 authors_by_pub[pub] = []
+                articles_by_pub[pub] = []
             headlines_by_pub[pub].append(article["title"])
             if article.get("author"):
                 authors_by_pub[pub].append(article["author"])
+            articles_by_pub[pub].append(article)
 
         pub_context = []
         for pub in publication_summaries:
@@ -173,12 +221,17 @@ data_assets should include the actual numbers/stats verbatim so they can be drop
             pub_context.append(
                 f"- {pub['name']} (Tier {pub['tier']}): Beat: {pub['beat']}. "
                 f"Audience: {pub['audience']}. "
-                f"Recent headlines: {'; '.join(headlines[:4]) if headlines else 'Not available'}. "
-                f"Known authors/contributors: {', '.join(authors[:4]) if authors else 'Not available'}"
+                f"Recent headlines: {'; '.join(headlines[:5]) if headlines else 'Not available'}. "
+                f"Known authors: {', '.join(authors[:4]) if authors else 'Not available'}"
             )
 
-        prompt = f"""You are a PR strategist matching a story to the right publications and journalists.
+        constraints_block = f"""
+## User Constraints (HARD RULES — must be respected in scoring and hook generation)
+{user_constraints}
+""" if user_constraints.strip() else ""
 
+        prompt = f"""You are a PR strategist who deeply understands what makes stories perform well for different audiences.
+{constraints_block}
 ## The Story
 Type: {news_analysis.get('news_type')}
 Core story: {news_analysis.get('core_story')}
@@ -187,12 +240,17 @@ Who cares: {', '.join(news_analysis.get('who_cares', []))}
 Newsworthiness: {news_analysis.get('newsworthiness_score')}/10
 Key data points: {', '.join(news_analysis.get('data_assets', [])) or 'None identified'}
 
-## Available Publications (with recent coverage and known authors)
+## Available Publications
 {chr(10).join(pub_context)}
 
 ---
 
-Score each publication for fit with this specific story. Consider their recent coverage patterns and known authors.
+For each publication, score fit AND generate an audience_hook.
+
+The audience_hook is NOT about topic matching. It answers:
+"Given what makes stories PERFORM WELL for this outlet's specific audience — what framing of this research would get the most clicks, shares, and engagement from their readers? What would make a [CISO/practitioner/exec] stop scrolling? What angle feels genuinely new and useful to them — not more of the same they've already seen?"
+
+Think about audience psychology, not keyword overlap. A CISO reading Dark Reading wants to feel like they have inside knowledge their peers don't. A VentureBeat reader wants to understand business implications. Frame accordingly.
 
 Return JSON:
 {{
@@ -200,25 +258,23 @@ Return JSON:
     {{
       "publication": "Publication name exactly as listed",
       "fit_score": <1-10>,
-      "fit_reasoning": "1-2 sentences: why this pub is or isn't a fit based on their beat AND recent coverage patterns",
-      "best_angle": "Which angle from the story analysis fits this outlet best, and why in 1 sentence",
-      "known_authors": ["Author name (what they appear to cover based on headlines)", "..."],
-      "suggested_journalist_type": "Describe the specific beat writer to target — e.g. 'enterprise security reporter covering IAM tools', 'startup reporter focused on funded B2B security companies'",
-      "pitch_hook": "A single sentence — the opening hook for a pitch to this outlet, written as if you're referencing something they recently covered",
+      "fit_reasoning": "1-2 sentences on why this pub is or isn't a fit",
+      "best_angle": "Which angle from the story fits this outlet, and why",
+      "audience_hook": "The specific framing that would perform best for THIS outlet's readers — what makes them click. Must respect user constraints.",
+      "known_authors": ["Author name if available", "..."],
+      "suggested_journalist_type": "The specific beat writer to target at this outlet",
       "wave_suitability": {{
         "good_for_exclusive": true,
         "good_for_launch_day": true,
         "good_for_followon": false,
-        "suitability_reasoning": "1 sentence explaining the wave fit"
+        "suitability_reasoning": "1 sentence"
       }}
     }}
   ]
 }}
 
-Include ALL publications in the response, sorted by fit_score descending.
-Be realistic — most publications won't be a great fit for any given story.
-A fit_score of 7+ means this is a real target worth pitching.
-If known_authors are available, list them — don't leave the array empty if the data is there.
+Include ALL publications sorted by fit_score descending.
+audience_hook must be a concrete, compelling sentence — not vague ("your readers will find this interesting").
 """
 
         try:
@@ -231,7 +287,6 @@ If known_authors are available, list them — don't leave the array empty if the
             )
             result = json.loads(response.choices[0].message.content)
             targets = result.get("targets", [])
-            # Attach publication metadata
             pub_meta = {p["name"]: p for p in publication_summaries}
             for t in targets:
                 meta = pub_meta.get(t["publication"], {})
@@ -240,109 +295,195 @@ If known_authors are available, list them — don't leave the array empty if the
                 t["beat"] = meta.get("beat", "")
                 t["audience"] = meta.get("audience", "")
                 t["recent_headlines"] = headlines_by_pub.get(t["publication"], [])
-                # Merge known authors from RSS fetch + LLM inference
+                t["articles"] = articles_by_pub.get(t["publication"], [])  # for scraping later
                 rss_authors = list(set(authors_by_pub.get(t["publication"], [])))
                 llm_authors = t.get("known_authors", [])
                 t["known_authors"] = rss_authors if rss_authors else llm_authors
             targets.sort(key=lambda x: x.get("fit_score", 0), reverse=True)
             return targets
-        except Exception as e:
+        except Exception:
             return []
 
     # ─────────────────────────────────────────────
-    # STEP 3: Plan campaign waves
+    # STEP 1c: Suggest wave assignments (for pre-selection in UI)
     # ─────────────────────────────────────────────
 
-    async def _plan_campaign(self, news_analysis: dict, targets: list[dict]) -> dict:
-        """Assign publications to campaign waves with timing and contingency logic."""
+    async def _suggest_waves(
+        self, news_analysis: dict, targets: list[dict], user_constraints: str
+    ) -> dict:
+        """Suggest which outlets belong in each wave. User can override."""
 
-        exclusive_viability = news_analysis.get("exclusive_viability", {})
-        qualifying_targets = [t for t in targets if t.get("fit_score", 0) >= 5]
+        qualifying = [t for t in targets if t.get("fit_score", 0) >= 5]
+        excl = news_analysis.get("exclusive_viability", {})
+
+        constraints_block = f"""
+## User Constraints
+{user_constraints}
+""" if user_constraints.strip() else ""
 
         targets_summary = json.dumps([{
             "publication": t["publication"],
             "tier": t["tier"],
             "fit_score": t["fit_score"],
-            "beat": t["beat"],
-            "wave_suitability": t.get("wave_suitability", {}),
-            "pitch_hook": t.get("pitch_hook", ""),
-            "known_authors": t.get("known_authors", [])
-        } for t in qualifying_targets], indent=2)
+            "audience_hook": t.get("audience_hook", ""),
+            "wave_suitability": t.get("wave_suitability", {})
+        } for t in qualifying], indent=2)
 
-        companion = news_analysis.get("companion_content_needed", {})
-
-        prompt = f"""You are a senior PR strategist planning the launch campaign sequence for a news announcement.
-
-## Story Summary
-Type: {news_analysis.get('news_type')}
+        prompt = f"""You are a PR strategist recommending a campaign wave structure.
+{constraints_block}
+## Story
 Newsworthiness: {news_analysis.get('newsworthiness_score')}/10
-Core story: {news_analysis.get('core_story')}
-Why now: {news_analysis.get('why_now')}
-Key data: {', '.join(news_analysis.get('data_assets', [])) or 'None identified'}
-Timing notes: {news_analysis.get('campaign_timing_notes', 'None')}
+Type: {news_analysis.get('news_type')}
+Can offer exclusive: {excl.get('can_offer_exclusive', False)}
+What to offer: {excl.get('what_to_offer', 'N/A')}
 
-## Exclusive Viability
-Can offer exclusive: {exclusive_viability.get('can_offer_exclusive', False)}
-What to offer: {exclusive_viability.get('what_to_offer', 'N/A')}
-Suggested embargo window: {exclusive_viability.get('embargo_window_suggested', 'N/A')}
-
-## Companion Content Available
-Press release: {companion.get('press_release', False)}
-Data exclusive: {companion.get('data_exclusive', False)}
-Byline opportunity: {companion.get('byline_opportunity', False)}
-Embargoed briefing: {companion.get('embargoed_briefing', False)}
-
-## Qualifying Publication Targets (fit score 5+)
+## Qualifying Targets
 {targets_summary}
 
----
+Suggest wave assignments. These are SUGGESTIONS — the user will confirm or change them.
 
-Plan the PR campaign wave structure. Assign each qualifying publication to the appropriate wave.
-
-RULES:
-1. Wave 1 (Exclusive/Embargo): EXACTLY ONE outlet. ONLY assign if can_offer_exclusive is true AND that outlet has fit_score >= 8 AND good_for_exclusive is true. If no outlet meets all criteria, set wave_1.publication to null.
-2. Wave 2 (Launch Day): 3-5 outlets. Pitched simultaneously when wire release goes live. Each outlet gets a DIFFERENT angle — not the same email.
-3. Wave 3 (Follow-on): Remaining outlets with fit_score >= 5. Pitched 1-2 weeks post-launch. Primarily bylines, deep-dives, niche verticals, podcasts. Use Wave 2 coverage as social proof.
-4. Do NOT put the same outlet in multiple waves.
-5. If the Wave 1 exclusive outlet is moved to Wave 2 (rejected/no response), Wave 2 should have a note about this.
-6. If newsworthiness_score <= 4: only populate Wave 2 with the best 3 fits, leave Wave 3 empty, and note the story needs strengthening.
+Rules:
+- Wave 1 (exclusive): ONE outlet only, fit_score >= 8, good_for_exclusive = true, only if can_offer_exclusive is true. Null otherwise.
+- Wave 2 (launch day): 3-5 outlets, pitched simultaneously. Best fit for news coverage.
+- Wave 3 (follow-on): Remaining outlets fit_score >= 5. Better for bylines, deep-dives, niche verticals.
+- Do NOT put the same outlet in multiple waves.
 
 Return JSON:
 {{
-  "campaign_summary": "2-3 sentence plain English description of the overall campaign strategy — what the arc is, why this wave structure makes sense for this story",
+  "wave_1_suggestion": "Publication name or null",
+  "wave_2_suggestions": ["pub1", "pub2", "pub3"],
+  "wave_3_suggestions": ["pub4", "pub5"],
+  "suggestion_rationale": "2-3 sentences explaining the overall strategy and why you assigned outlets this way"
+}}
+"""
+
+        try:
+            response = await litellm.acompletion(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.3,
+                max_tokens=800
+            )
+            return json.loads(response.choices[0].message.content)
+        except Exception:
+            # Fallback: auto-assign by fit_score
+            sorted_q = sorted(qualifying, key=lambda x: x.get("fit_score", 0), reverse=True)
+            return {
+                "wave_1_suggestion": None,
+                "wave_2_suggestions": [t["publication"] for t in sorted_q[:4]],
+                "wave_3_suggestions": [t["publication"] for t in sorted_q[4:7]],
+                "suggestion_rationale": "Auto-assigned by fit score (wave suggestion LLM call failed)."
+            }
+
+    # ─────────────────────────────────────────────
+    # STEP 2a: Build campaign plan from user selections
+    # ─────────────────────────────────────────────
+
+    async def _plan_campaign_from_selections(
+        self,
+        news_analysis: dict,
+        targets_lookup: dict,
+        wave_1_pub: Optional[str],
+        wave_2_pubs: list[str],
+        wave_3_pubs: list[str],
+        user_constraints: str,
+        launch_date: str = "",
+    ) -> dict:
+        """Build full campaign plan (with contingencies + timing) based on user's selections."""
+
+        excl = news_analysis.get("exclusive_viability", {})
+        constraints_block = f"""
+## User Constraints
+{user_constraints}
+""" if user_constraints.strip() else ""
+
+        launch_date_block = f"""
+## Launch Date
+{launch_date}
+Use this to calculate EXACT calendar dates for each wave and each follow-up.
+Format dates as human-readable short strings like "Tue Apr 15" — NOT ISO format.
+""" if launch_date.strip() else ""
+
+        # Build context about selected targets
+        selected_context = []
+        all_selected = []
+        if wave_1_pub:
+            all_selected.append(wave_1_pub)
+        all_selected.extend(wave_2_pubs)
+        all_selected.extend(wave_3_pubs)
+
+        for pub_name in all_selected:
+            t = targets_lookup.get(pub_name, {})
+            selected_context.append({
+                "publication": pub_name,
+                "wave": "1" if pub_name == wave_1_pub else ("2" if pub_name in wave_2_pubs else "3"),
+                "fit_score": t.get("fit_score", 0),
+                "audience_hook": t.get("audience_hook", ""),
+                "wave_suitability": t.get("wave_suitability", {})
+            })
+
+        prompt = f"""You are a senior PR strategist building a campaign execution plan.
+{constraints_block}{launch_date_block}
+## Story
+Core story: {news_analysis.get('core_story')}
+Newsworthiness: {news_analysis.get('newsworthiness_score')}/10
+Can offer exclusive: {excl.get('can_offer_exclusive', False)}
+Exclusive offer: {excl.get('what_to_offer', 'N/A')}
+
+## User's Selected Targets (already assigned to waves by user)
+{json.dumps(selected_context, indent=2)}
+
+Build the campaign execution plan for these exact selections. Do NOT reassign outlets — respect the user's wave choices.
+
+## Timing Best-Practice Rules (always apply these regardless of launch_date)
+- Best send days: Tuesday, Wednesday, or Thursday only
+- Best send time: 7–9am recipient's local time (before their morning standup/inbox flood)
+- Wave 1 exclusive: send at minimum 48h before launch; allow journalist 24h to confirm before wire release goes out
+- Wave 2 (launch day): send simultaneously with the wire release, or 30 minutes before it goes live
+- Wave 3 follow-on: 7–10 business days after launch, NOT before (let Wave 2 coverage accumulate)
+- Follow-up cadence: if no response, follow up once at +3 business days, then one final at +5 business days, then move on
+- Do NOT follow up on launch day — too much noise, journalists are already flooded
+- If launch date falls on Mon or Fri, move Wave 2 pitches to the next Tuesday
+
+Return JSON:
+{{
+  "campaign_summary": "2-3 sentence overview of the campaign strategy",
   "wave_1": {{
-    "publication": "Exact publication name or null",
-    "timing_label": "e.g. '48 hours before launch' or '72 hours before launch' or null",
-    "rationale": "Why this outlet for the exclusive — what makes them the right first call",
-    "exclusive_offer": "The exact specific offer to make: what they get, when they get it, what no one else gets. Be concrete.",
+    "publication": "{wave_1_pub or 'null'}",
+    "timing_label": "e.g. '48 hours before launch'",
+    "send_date": "Calculated date if launch_date provided, else 'TBD — enter launch date for exact dates'",
+    "send_time_guidance": "e.g. 'Send Tuesday 7–9am EST — gives journalist 48h to confirm before your wire drops'",
+    "follow_up_window": "e.g. 'Follow up Thu Apr 17 if no response — one follow-up only on exclusives'",
+    "rationale": "Why this outlet for the exclusive",
+    "exclusive_offer": "Exact concrete offer — what they get, when, what no one else gets",
     "contingency": {{
-      "if_rejected": "Specific action: which outlet to move to Wave 2, whether to offer a second exclusive and to whom, exact next step",
-      "if_no_response_48h": "Specific action: follow-up once, then move where? Be prescriptive.",
-      "second_choice_exclusive": "Publication name or null — if rejected, offer exclusive to this outlet instead before going to Wave 2 full batch"
+      "if_rejected": "Specific next step if this outlet declines",
+      "if_no_response_48h": "Specific next step if no reply in 48 hours",
+      "second_choice_exclusive": "Which Wave 2 outlet to approach for exclusive instead, or null"
     }}
   }},
   "wave_2": {{
     "timing_label": "Launch Day",
+    "send_date": "Calculated date if launch_date provided, else 'TBD'",
+    "send_time_guidance": "e.g. 'Send 30 min before wire release goes live — typically 8am–9am EST'",
+    "follow_up_window": "e.g. 'Follow up Fri Apr 22 (+3 business days), final follow-up Wed Apr 27 (+5 biz days)'",
     "publications": [
-      {{
-        "publication": "Publication name",
-        "angle_note": "1-2 sentences: the specific angle for THIS outlet — how it differs from others in this wave"
-      }}
+      {{"publication": "name", "angle_note": "The specific angle for THIS outlet's audience — must be distinct from others"}}
     ],
-    "wave_2_note": "Important coordination note — e.g. 'pitch all simultaneously, do not stagger' or 'if Wave 1 exclusive was accepted, wait for embargo lift before sending'"
+    "wave_2_note": "Coordination note — pitch simultaneously, wait for embargo lift, etc."
   }},
   "wave_3": {{
-    "timing_label": "1-2 weeks post-launch",
+    "timing_label": "7–10 business days post-launch",
+    "send_date": "Calculated date if launch_date provided, else 'TBD'",
+    "send_time_guidance": "e.g. 'Send Tuesday 7–9am — reference 2-3 specific pieces of coverage already received'",
+    "follow_up_window": "e.g. 'One follow-up at +3 business days if no response'",
     "publications": [
-      {{
-        "publication": "Publication name",
-        "angle_note": "What angle your readers haven't seen yet — the follow-on hook",
-        "format_suggestion": "e.g. 'contributed byline', 'podcast pitch', 'data-led feature request', 'analyst briefing'"
-      }}
+      {{"publication": "name", "angle_note": "The follow-on angle your readers haven't seen yet", "format_suggestion": "e.g. contributed byline, podcast pitch, data feature"}}
     ],
-    "wave_3_strategy": "How to use Wave 2 coverage as social proof — exactly what to reference and how to frame it"
+    "wave_3_strategy": "How to use Wave 2 coverage as social proof in Wave 3 pitches"
   }},
-  "contingency_if_wave2_thin": "If Wave 2 generates fewer than 2 placements, specific guidance on how to adapt Wave 3 — what to emphasize, how to reframe, which outlets to prioritize"
+  "contingency_if_wave2_thin": "If Wave 2 gets fewer than 2 placements, specific guidance on Wave 3 adaptation"
 }}
 """
 
@@ -356,29 +497,31 @@ Return JSON:
             )
             return json.loads(response.choices[0].message.content)
         except Exception as e:
+            # Build minimal plan from selections
             return {
-                "campaign_summary": f"Campaign planning failed: {str(e)}",
-                "wave_1": {"publication": None},
-                "wave_2": {"timing_label": "Launch Day", "publications": [], "wave_2_note": ""},
-                "wave_3": {"timing_label": "1-2 weeks post-launch", "publications": [], "wave_3_strategy": ""},
+                "campaign_summary": f"Campaign plan generation failed: {str(e)}",
+                "wave_1": {"publication": wave_1_pub, "timing_label": "48h before launch", "rationale": "", "exclusive_offer": excl.get("what_to_offer", ""), "contingency": {}},
+                "wave_2": {"timing_label": "Launch Day", "publications": [{"publication": p, "angle_note": ""} for p in wave_2_pubs], "wave_2_note": ""},
+                "wave_3": {"timing_label": "1-2 weeks post-launch", "publications": [{"publication": p, "angle_note": "", "format_suggestion": ""} for p in wave_3_pubs], "wave_3_strategy": ""},
                 "contingency_if_wave2_thin": ""
             }
 
     # ─────────────────────────────────────────────
-    # STEP 4: Draft pitches by wave
+    # STEP 2b: Draft pitches by wave
     # ─────────────────────────────────────────────
 
     async def _draft_pitches_by_wave(
         self,
         brand_context: str,
         news_analysis: dict,
+        user_constraints: str,
         campaign_plan: dict,
         targets_lookup: dict,
     ) -> dict:
-        """Draft personalized pitch emails for each wave. Wave 2 + 3 drafted in parallel."""
+        """Draft personalized pitch emails for each wave. Wave 2 + 3 in parallel."""
         waves = {}
 
-        # ── Wave 1 — single exclusive pitch ──
+        # ── Wave 1 — exclusive ──
         wave1_plan = campaign_plan.get("wave_1", {})
         wave1_pub = wave1_plan.get("publication") if wave1_plan else None
         if wave1_pub and wave1_pub in targets_lookup:
@@ -386,6 +529,7 @@ Return JSON:
             pitch = await self._draft_single_pitch(
                 brand_context=brand_context,
                 news_analysis=news_analysis,
+                user_constraints=user_constraints,
                 target=target,
                 wave=1,
                 wave_label="Exclusive / Embargo",
@@ -394,85 +538,68 @@ Return JSON:
                 exclusive_offer=wave1_plan.get("exclusive_offer", ""),
                 angle_note=wave1_plan.get("rationale", ""),
             )
-            waves["wave_1"] = {
-                **wave1_plan,
-                "target_data": {**target, "pitch": pitch}
-            }
+            waves["wave_1"] = {**wave1_plan, "target_data": {**target, "pitch": pitch}}
         else:
             waves["wave_1"] = None
 
-        # ── Wave 2 — parallel launch day pitches ──
+        # ── Wave 2 — parallel ──
         wave2_entries = campaign_plan.get("wave_2", {}).get("publications", [])
-        wave2_coroutines = []
+        wave2_coros = []
         wave2_meta = []
         for entry in wave2_entries:
             pub_name = entry["publication"]
-            target = targets_lookup.get(pub_name, {"publication": pub_name, "beat": "", "audience": "", "recent_headlines": [], "known_authors": []})
-            wave2_coroutines.append(
-                self._draft_single_pitch(
-                    brand_context=brand_context,
-                    news_analysis=news_analysis,
-                    target=target,
-                    wave=2,
-                    wave_label="Launch Day",
-                    wave_timing="Launch Day",
-                    is_exclusive=False,
-                    angle_note=entry.get("angle_note", ""),
-                )
-            )
+            target = targets_lookup.get(pub_name, {"publication": pub_name, "beat": "", "audience": "", "recent_headlines": [], "known_authors": [], "scraped_articles": []})
+            wave2_coros.append(self._draft_single_pitch(
+                brand_context=brand_context, news_analysis=news_analysis,
+                user_constraints=user_constraints, target=target,
+                wave=2, wave_label="Launch Day", wave_timing="Launch Day",
+                is_exclusive=False, angle_note=entry.get("angle_note", ""),
+            ))
             wave2_meta.append((entry, target))
 
-        wave2_pitches = await asyncio.gather(*wave2_coroutines, return_exceptions=True)
+        wave2_pitches = await asyncio.gather(*wave2_coros, return_exceptions=True)
         waves["wave_2"] = []
         for (entry, target), pitch in zip(wave2_meta, wave2_pitches):
             if isinstance(pitch, Exception):
                 pitch = {"subject_line": "Error", "body": str(pitch), "word_count": 0, "personalization_notes": "", "companion_content_recommended": ""}
-            waves["wave_2"].append({
-                "angle_note": entry.get("angle_note", ""),
-                "target_data": {**target, "pitch": pitch}
-            })
+            waves["wave_2"].append({"angle_note": entry.get("angle_note", ""), "target_data": {**target, "pitch": pitch}})
 
-        # ── Wave 3 — parallel follow-on pitches ──
+        # ── Wave 3 — parallel ──
         wave3_entries = campaign_plan.get("wave_3", {}).get("publications", [])
         wave3_strategy = campaign_plan.get("wave_3", {}).get("wave_3_strategy", "")
-        wave3_coroutines = []
+        wave3_coros = []
         wave3_meta = []
         for entry in wave3_entries:
             pub_name = entry["publication"]
-            target = targets_lookup.get(pub_name, {"publication": pub_name, "beat": "", "audience": "", "recent_headlines": [], "known_authors": []})
-            wave3_coroutines.append(
-                self._draft_single_pitch(
-                    brand_context=brand_context,
-                    news_analysis=news_analysis,
-                    target=target,
-                    wave=3,
-                    wave_label="Follow-on",
-                    wave_timing="1-2 weeks post-launch",
-                    is_exclusive=False,
-                    angle_note=entry.get("angle_note", ""),
-                    format_suggestion=entry.get("format_suggestion", ""),
-                    wave_3_strategy=wave3_strategy,
-                )
-            )
+            target = targets_lookup.get(pub_name, {"publication": pub_name, "beat": "", "audience": "", "recent_headlines": [], "known_authors": [], "scraped_articles": []})
+            wave3_coros.append(self._draft_single_pitch(
+                brand_context=brand_context, news_analysis=news_analysis,
+                user_constraints=user_constraints, target=target,
+                wave=3, wave_label="Follow-on", wave_timing="1-2 weeks post-launch",
+                is_exclusive=False, angle_note=entry.get("angle_note", ""),
+                format_suggestion=entry.get("format_suggestion", ""),
+                wave_3_strategy=wave3_strategy,
+            ))
             wave3_meta.append((entry, target))
 
-        wave3_pitches = await asyncio.gather(*wave3_coroutines, return_exceptions=True)
+        wave3_pitches = await asyncio.gather(*wave3_coros, return_exceptions=True)
         waves["wave_3"] = []
         for (entry, target), pitch in zip(wave3_meta, wave3_pitches):
             if isinstance(pitch, Exception):
                 pitch = {"subject_line": "Error", "body": str(pitch), "word_count": 0, "personalization_notes": "", "companion_content_recommended": ""}
-            waves["wave_3"].append({
-                "angle_note": entry.get("angle_note", ""),
-                "format_suggestion": entry.get("format_suggestion", ""),
-                "target_data": {**target, "pitch": pitch}
-            })
+            waves["wave_3"].append({"angle_note": entry.get("angle_note", ""), "format_suggestion": entry.get("format_suggestion", ""), "target_data": {**target, "pitch": pitch}})
 
         return waves
+
+    # ─────────────────────────────────────────────
+    # STEP 2c: Draft one pitch
+    # ─────────────────────────────────────────────
 
     async def _draft_single_pitch(
         self,
         brand_context: str,
         news_analysis: dict,
+        user_constraints: str,
         target: dict,
         wave: int,
         wave_label: str,
@@ -483,79 +610,96 @@ Return JSON:
         format_suggestion: str = "",
         wave_3_strategy: str = "",
     ) -> dict:
-        """Draft one highly personalized pitch email for one target publication."""
+        """Draft one personalized pitch email with scraped article context."""
 
-        recent_headlines = target.get("recent_headlines", [])[:5]
         known_authors = target.get("known_authors", [])
         data_assets = news_analysis.get("data_assets", [])
         companion = news_analysis.get("companion_content_needed", {})
+        audience_hook = target.get("audience_hook", angle_note)
+        scraped_articles = target.get("scraped_articles", [])
 
-        # Format recent headlines with context
-        if recent_headlines:
-            headlines_block = "\n".join(f"  - {h}" for h in recent_headlines)
+        # Build scraped article context block
+        if scraped_articles:
+            article_blocks = []
+            for art in scraped_articles[:3]:
+                quality = art.get("scrape_quality", "failed")
+                title = art.get("title", "")
+                author = art.get("author", "")
+                body = art.get("body_text", "")
+                note = art.get("scrape_note", "")
+                block = f"Title: {title}"
+                if author:
+                    block += f"\nAuthor: {author}"
+                block += f"\nContent quality: {quality} ({note})"
+                if body and quality != "failed":
+                    block += f"\nContent excerpt:\n{body[:800]}"
+                article_blocks.append(block)
+            articles_context = "\n\n---\n\n".join(article_blocks)
+            articles_intro = "Use the article content below to understand HOW this outlet frames stories — their argument structure, their angle choices, what they emphasize for their audience. Do NOT just reference the topic; understand the framing."
         else:
-            headlines_block = "  (No recent headlines available — write pitch based on known beat)"
+            articles_context = "(No article content available — work from publication description and beat)"
+            articles_intro = "No scraped article content available for this outlet."
 
-        if known_authors:
-            authors_block = ", ".join(known_authors[:4])
-        else:
-            authors_block = "Unknown — address to the security/tech beat writer"
+        authors_block = ", ".join(known_authors[:4]) if known_authors else "Unknown — address to the beat writer"
+        data_block = "\n".join(f"  - {d}" for d in data_assets) if data_assets else "  (No specific data points identified)"
 
-        if data_assets:
-            data_block = "\n".join(f"  - {d}" for d in data_assets)
-        else:
-            data_block = "  (No specific data points identified)"
+        constraints_block = f"""
+## User Constraints (HARD RULES — these override all other instructions)
+{user_constraints}
+""" if user_constraints.strip() else ""
 
-        # Wave-specific instructions
+        # Wave-specific rules
         if wave == 1:
-            wave_instructions = f"""WAVE 1 — EXCLUSIVE PITCH RULES:
-- This is an exclusive offer. ONE outlet only gets this.
-- You MUST include the specific exclusive offer in the pitch: {exclusive_offer}
-- Mention the embargo window explicitly: {wave_timing}
-- Keep the pitch body under 120 words — exclusives work because they are rare and concise
-- The subject line should signal exclusivity without using the word "exclusive" clumsily — e.g. "Embargo: [story] — first look for [Publication]"
-- Opening must reference something they specifically recently covered (use a headline above)"""
+            wave_rules = f"""WAVE 1 — EXCLUSIVE PITCH:
+- ONE outlet only. This pitch is a pre-launch exclusive offer.
+- MUST include the exclusive offer: {exclusive_offer}
+- MUST mention the embargo window: {wave_timing}
+- Under 120 words in the body — exclusives work because they are rare and concise
+- Subject line should signal first access without being clunky — e.g. "Embargo: [story] — [Publication] first look"
+- Open by showing you understand their audience and what performs well for them (use audience_hook)
+- The exclusive offer is the closer, not the opener"""
         elif wave == 2:
-            wave_instructions = f"""WAVE 2 — LAUNCH DAY PITCH RULES:
-- The press release is now live on the wire. You can reference this.
+            wave_rules = f"""WAVE 2 — LAUNCH DAY PITCH:
+- Press release is now live on the wire. You may reference this.
 - Angle for this outlet specifically: {angle_note}
-- This outlet's angle MUST differ from any exclusive pitch sent earlier
-- Reference a specific recent headline from this outlet to show you read their work
-- Keep under 150 words
-- Offer: interview, data, or quote — make the ask specific"""
+- Under 150 words
+- Lead with the audience_hook — what will make THEIR readers click
+- Offer: interview, data access, or quote — make the ask specific"""
         else:
-            wave_instructions = f"""WAVE 3 — FOLLOW-ON PITCH RULES:
-- Timing: 1-2 weeks after launch. Wave 2 coverage may already be published.
-- Use Wave 2 coverage as social proof: {wave_3_strategy}
-- Angle for this outlet: {angle_note}
-- Format suggested: {format_suggestion if format_suggestion else 'contributed byline or feature pitch'}
-- Position this as "here's the angle your readers haven't seen yet"
-- Reference the existing coverage briefly, then pivot to the fresh angle
-- Keep under 150 words"""
+            wave_rules = f"""WAVE 3 — FOLLOW-ON PITCH:
+- Timing: 1-2 weeks after launch
+- Social proof strategy: {wave_3_strategy}
+- Angle: {angle_note}
+- Format: {format_suggestion or 'contributed byline or feature pitch'}
+- Brief reference to existing coverage, then pivot to the angle your readers haven't seen yet
+- Under 150 words"""
 
-        prompt = f"""You are a PR professional writing a cold pitch email to a journalist. This must be genuinely personalized — not a template with a name swapped in.
-
+        prompt = f"""You are a PR professional writing a pitch email. This must be genuinely personalized — not a template.
+{constraints_block}
 ## Target Publication
 Publication: {target.get('publication', 'Unknown')}
 Beat: {target.get('beat', 'Unknown')}
 Audience: {target.get('audience', 'Unknown')}
-Known contributors/authors at this outlet: {authors_block}
-Target journalist type: {target.get('suggested_journalist_type', 'Beat reporter covering this topic')}
+Known contributors: {authors_block}
+Journalist type to target: {target.get('suggested_journalist_type', 'Beat reporter')}
 
-## Their Recent Coverage (REFERENCE THESE — pick 1-2 to show you actually read them)
-{headlines_block}
+## Audience Hook (the framing that performs best for this outlet's readers)
+{audience_hook}
+
+## What this outlet has been writing about
+{articles_intro}
+
+{articles_context}
 
 ## The Story
 {news_analysis.get('core_story', '')}
 Type: {news_analysis.get('news_type', '')}
 Why now: {news_analysis.get('why_now', '')}
-Best angle for this outlet: {target.get('best_angle', angle_note)}
-Opening hook idea: {target.get('pitch_hook', '')}
 
-## Specific Data Points to Work In (use actual numbers — don't be vague)
+## Specific Data Points (use actual numbers — not vague claims)
 {data_block}
 
-## Brand Context (use exact brand name, do not invent claims)
+## Brand Context
 {brand_context}
 
 ## Companion Content Available
@@ -564,31 +708,32 @@ Opening hook idea: {target.get('pitch_hook', '')}
 - Byline opportunity: {companion.get('byline_opportunity', False)}
 - Embargoed briefing: {companion.get('embargoed_briefing', False)}
 
-## Campaign Wave Context
-Wave: {wave_label} — {wave_timing}
+## Wave: {wave_label} — {wave_timing}
 
-{wave_instructions}
+{wave_rules}
 
 ---
 
-PITCH WRITING RULES (apply to all waves):
-1. First sentence MUST reference something specific they recently covered — a headline, a topic, a beat they own
-2. If known authors are listed, write as if addressing that type of journalist specifically
-3. Include at least one specific data point or stat from the data assets above — not vague claims
-4. DO NOT use filler phrases: "I hope this finds you well", "I wanted to reach out", "I look forward to hearing from you"
-5. DO NOT use the brand's document language verbatim — write naturally, like a PR pro who deeply knows the story
-6. DO NOT invent statistics or capabilities not in the brand context
-7. Sign off simply — first name, title optional
+PITCH RULES:
+1. Lead with the audience_hook — what makes THEIR readers engage. Not a topic match, a genuine hook.
+2. Include at least one specific data point verbatim from the data assets
+3. If scraped article content is available, reference the ARGUMENT or FRAMING the journalist used — not just the headline topic
+4. DO NOT: "I hope this finds you well", "I wanted to reach out", "I look forward to hearing from you"
+5. DO NOT use brand document language verbatim — write naturally
+6. DO NOT invent statistics or claims not in the brand context
+7. Respect all user constraints — they override your defaults
+8. Sign off simply
 
 Return JSON:
 {{
-  "subject_line": "The email subject line — specific, no fluff",
-  "body": "The full email body (plain text, use \\n for line breaks, no HTML)",
+  "subject_line": "Specific, no fluff — ideally references their audience's current concern",
+  "body": "Full email body (plain text, \\n for line breaks)",
   "word_count": <integer>,
-  "personalization_notes": "What specific thing about this outlet/journalist drove the personalization choices — be specific about which headline you referenced and why",
-  "companion_content_recommended": "What to attach or offer alongside this specific pitch",
-  "exclusive_offer_line": {"the exact 1-sentence offer if Wave 1, null otherwise"},
-  "follow_on_hook": {"the exact coverage-reference line if Wave 3, null otherwise"}
+  "personalization_notes": "What specific thing from the scraped content or audience analysis drove your choices — be precise",
+  "companion_content_recommended": "What to attach or offer with this pitch",
+  "scrape_quality_used": "What quality level of article content you had to work with",
+  "exclusive_offer_line": "The exact 1-sentence offer if Wave 1, null otherwise",
+  "follow_on_hook": "The coverage-reference line if Wave 3, null otherwise"
 }}
 """
 
@@ -608,6 +753,93 @@ Return JSON:
                 "word_count": 0,
                 "personalization_notes": "",
                 "companion_content_recommended": "",
+                "scrape_quality_used": "failed",
                 "exclusive_offer_line": None,
                 "follow_on_hook": None,
+            }
+
+    # ─────────────────────────────────────────────
+    # STEP 2d: Draft press release + PR firm coordination memo
+    # ─────────────────────────────────────────────
+
+    async def _draft_press_release(
+        self,
+        brand_context: str,
+        news_content: str,
+        user_constraints: str,
+        news_analysis: dict,
+        campaign_plan: dict,
+        launch_date: str = "",
+    ) -> dict:
+        """
+        Draft a wire-ready press release + coordination guidance for PR firms.
+        Runs in parallel with pitch drafting — no extra latency.
+        """
+
+        constraints_block = f"""
+## User Constraints (HARD RULES)
+{user_constraints}
+""" if user_constraints.strip() else ""
+
+        launch_date_line = f"Launch / wire date: {launch_date}" if launch_date.strip() else "Launch date: TBD"
+        wave_1_pub = campaign_plan.get("wave_1", {}).get("publication", "None")
+        wave_1_send = campaign_plan.get("wave_1", {}).get("send_date", "TBD")
+        wire_timing = campaign_plan.get("wave_2", {}).get("send_date", "Launch day")
+        exclusive_offer = campaign_plan.get("wave_1", {}).get("exclusive_offer", "")
+
+        prompt = f"""You are a senior PR professional. Write a wire-ready press release AND create a practical coordination memo for working with a PR firm.
+{constraints_block}
+## Story Details
+{news_analysis.get('core_story', '')}
+Type: {news_analysis.get('news_type', '')}
+Key data points: {', '.join(news_analysis.get('data_assets', [])) or 'See content below'}
+
+## Brand Context
+{brand_context}
+
+## Source Content
+{news_content[:3000]}
+
+## Campaign Context
+{launch_date_line}
+Wave 1 exclusive target: {wave_1_pub} (send date: {wave_1_send})
+Wire release goes live: {wire_timing}
+Exclusive offer being made: {exclusive_offer or 'None'}
+
+---
+
+Return JSON with exactly these fields:
+
+{{
+  "press_release": "Full formatted press release FOR THE WIRE. Format:\\nFOR IMMEDIATE RELEASE\\n\\n[HEADLINE IN CAPS]\\n\\n[Subheadline — 1 sentence]\\n\\n[City, Date] — [Lead paragraph — who, what, where, when, why in 2-3 sentences. Inverted pyramid. Strongest news first.]\\n\\n[Body paragraph 2 — supporting detail, data points]\\n\\n[Quote from company spokesperson — specific, not generic platitude]\\n\\n[Body paragraph 3 — product/service detail or broader context]\\n\\n[Second quote if appropriate — customer, partner, or analyst]\\n\\n[Forward-looking paragraph — what this means for the market]\\n\\n### About [Company]\\n[Boilerplate — 3-4 sentences]\\n\\nMedia Contact:\\n[Name]\\n[Title]\\n[Email]\\n[Phone]",
+
+  "pr_firm_brief": "Short internal memo written AS IF you are the client briefing your PR firm. Start with: 'Here is what to tell your PR firm:'. Cover: (1) the campaign structure and timing, (2) which outlet has the exclusive and what the offer is, (3) exactly when the wire release should go out and NOT before, (4) what they should NOT share until the embargo lifts, (5) what assets you will provide them (quote approval, exec availability for interviews, data sheet, etc.)",
+
+  "embargo_protocol": "Step-by-step ordered list of the embargo management sequence — who gets contacted first, what they receive, when each embargo lifts, what triggers the wire release, how to handle a journalist who breaks embargo. Write as numbered steps, practical and specific.",
+
+  "wire_timing_note": "1-2 sentence practical note on exactly when to send to the wire relative to the campaign waves — e.g. 'Send to PR Newswire/Business Wire to embargo lift at [time] on [date], 30 minutes before Wave 2 pitches go out.'"
+}}
+
+Rules:
+- Press release must be ready to copy-paste to a wire service — proper structure, real headline, real quote (use [SPOKESPERSON NAME] as placeholder if unknown)
+- No vague language in the PR firm brief — be concrete about dates, outlets, what to hold back
+- Embargo protocol should be specific enough that a junior PR coordinator could execute it
+- Respect all user constraints
+"""
+
+        try:
+            response = await litellm.acompletion(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.5,
+                max_tokens=3000
+            )
+            return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            return {
+                "press_release": f"Press release generation failed: {str(e)}",
+                "pr_firm_brief": "",
+                "embargo_protocol": "",
+                "wire_timing_note": "",
             }

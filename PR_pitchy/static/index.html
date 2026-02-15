@@ -60,11 +60,17 @@
                 </div>
             </div>
 
+            <div class="field-group launch-date-field">
+                <label>Launch / Announcement Date <span style="font-weight:400; text-transform:none; font-size:0.75rem; color:#888;">(optional)</span></label>
+                <span class="hint">If provided, the tool will calculate exact calendar dates for each wave and follow-up windows. Leave blank for relative timing guidance only.</span>
+                <input type="date" id="launch-date" placeholder="YYYY-MM-DD">
+            </div>
+
         </div>
 
         <div class="submit-row">
             <button class="btn-primary" id="analyze-btn" onclick="app.analyze()">
-                Generate Pitches
+                Analyze &amp; Find Targets
             </button>
             <span class="status-msg" id="status-msg"></span>
         </div>
@@ -90,9 +96,16 @@
 
         <!-- Tab: Campaign Waves -->
         <div class="tab-panel" id="tab-targets">
-            <div class="section-header">Campaign Waves</div>
-            <div class="section-sub">Three-wave campaign plan: exclusive (pre-launch), launch day (simultaneous pitches), and follow-on (1-2 weeks later with social proof). Expand any target to see the draft pitch.</div>
+            <div class="section-header" id="waves-tab-header">Campaign Waves</div>
+            <div class="section-sub" id="waves-tab-sub">After analysis, select which publications to pitch in each wave, then click "Build Campaign" to scrape their articles and draft personalized pitches.</div>
             <div class="targets-list" id="targets-list"></div>
+            <!-- Sticky build bar — shown during target selection step -->
+            <div class="build-campaign-bar" id="build-campaign-bar" style="display:none;">
+                <div class="selection-count" id="selection-count-msg">Select Wave 2 targets to continue</div>
+                <button class="btn-build" id="build-btn" onclick="app.buildCampaign()" disabled>
+                    <span id="build-btn-inner">Build Campaign →</span>
+                </button>
+            </div>
         </div>
 
         <!-- Tab: Publication Library -->

@@ -764,3 +764,517 @@ textarea:focus { outline: none; border-color: var(--highlight-2); background: wh
     font-style: italic;
     margin-bottom: 10px;
 }
+
+
+/* ═══════════════════════════════════════════════
+   STEP 1 — TARGET SELECTION UI
+   ═══════════════════════════════════════════════ */
+
+/* Section wrapper for each wave's selection group */
+.target-selection-section {
+    margin-bottom: 32px;
+}
+
+.selection-wave-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--grey-light);
+}
+.selection-wave-header .wave-badge { flex-shrink: 0; }
+.selection-wave-instruction {
+    font-size: 0.78rem;
+    color: var(--grey-medium);
+    font-style: italic;
+    margin-left: auto;
+}
+
+/* Grid of selectable cards */
+.target-select-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+/* Selectable card — click to toggle */
+.target-select-card {
+    background: white;
+    border: 2px solid var(--grey-light);
+    border-radius: 10px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    user-select: none;
+    position: relative;
+}
+.target-select-card:hover {
+    border-color: var(--highlight-2);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.target-select-card.selected {
+    border-color: var(--headline);
+    background: #f7f4fb;
+    box-shadow: 0 2px 10px rgba(74,52,83,0.12);
+}
+
+/* Checkbox/radio visual in top-right corner */
+.select-indicator {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--grey-light);
+    border-radius: 50%;
+    background: white;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.target-select-card.selected .select-indicator {
+    background: var(--headline);
+    border-color: var(--headline);
+}
+.target-select-card.selected .select-indicator::after {
+    content: '✓';
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 700;
+}
+/* Radio variant for Wave 1 (single selection) */
+.target-select-card.radio-style .select-indicator {
+    border-radius: 50%;
+}
+.target-select-card.radio-style.selected .select-indicator::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+    display: block;
+}
+
+/* Card top: pub name + score + tier badge */
+.select-card-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding-right: 28px;  /* avoid overlap with indicator */
+}
+.select-card-name {
+    font-family: var(--font-heading);
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--headline);
+    flex: 1;
+    min-width: 0;
+}
+.select-card-score {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* Audience hook — the key value prop per card */
+.audience-hook-box {
+    background: #f0edf5;
+    border-left: 3px solid var(--headline);
+    border-radius: 0 6px 6px 0;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    font-size: 0.81rem;
+    color: #4a3453;
+    line-height: 1.45;
+    font-weight: 500;
+}
+.audience-hook-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--headline);
+    opacity: 0.6;
+    margin-bottom: 3px;
+}
+
+/* Known authors line */
+.select-card-authors {
+    font-size: 0.74rem;
+    color: var(--highlight-2);
+    margin-bottom: 6px;
+}
+
+/* Recent headlines in selection card */
+.select-card-headlines {
+    font-size: 0.74rem;
+    color: var(--grey-medium);
+    line-height: 1.4;
+    margin-top: 4px;
+}
+.select-card-headlines ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.select-card-headlines li {
+    padding-left: 12px;
+    position: relative;
+    margin-bottom: 2px;
+}
+.select-card-headlines li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--highlight-2);
+    font-size: 0.7rem;
+}
+
+/* Pre-selected badge */
+.pre-selected-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #eaf2e6;
+    color: #5a7a4a;
+    padding: 2px 7px;
+    border-radius: 8px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+/* Suggestion rationale callout */
+.suggestion-rationale-box {
+    background: #dde4ee;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 0.82rem;
+    color: #4a5e7a;
+    line-height: 1.5;
+}
+.suggestion-rationale-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #4a5e7a;
+    opacity: 0.75;
+    margin-bottom: 5px;
+}
+
+/* Sticky bottom bar with Build Campaign button */
+.build-campaign-bar {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 1px solid var(--grey-light);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 100;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.07);
+    border-radius: 0 0 12px 12px;
+}
+.build-campaign-bar .selection-count {
+    font-size: 0.82rem;
+    color: var(--grey-medium);
+    flex: 1;
+}
+.build-campaign-bar .selection-count strong {
+    color: var(--headline);
+}
+.btn-build {
+    background: var(--headline);
+    color: white;
+    border: none;
+    padding: 11px 28px;
+    border-radius: 8px;
+    font-family: var(--font-heading);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.btn-build:hover { background: #3a2742; }
+.btn-build:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Scrape quality badge shown on pitch cards */
+.scrape-quality-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 8px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.scrape-quality-full    { background: #eaf2e6; color: #5a7a4a; }
+.scrape-quality-partial { background: #fdf4e6; color: #9a7030; }
+.scrape-quality-title   { background: var(--table-shade); color: #888; }
+.scrape-quality-failed  { background: #faeaea; color: #b85050; }
+
+
+/* ═══════════════════════════════════════════════
+   WAVE EXCLUSIVITY — LOCKED CARDS
+   ═══════════════════════════════════════════════ */
+
+/* Card locked because pub is in another wave */
+.target-select-card.locked-by-wave {
+    opacity: 0.42;
+    cursor: not-allowed;
+    border: 2px dashed var(--grey-light) !important;
+    background: var(--grey-lightest) !important;
+    box-shadow: none !important;
+    pointer-events: none;
+}
+.target-select-card.locked-by-wave:hover {
+    border-color: var(--grey-light) !important;
+    box-shadow: none !important;
+}
+
+/* Label showing which wave already has this pub */
+.locked-wave-label {
+    display: inline-block;
+    font-size: 0.63rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #e8e4ef;
+    color: var(--headline);
+    padding: 2px 7px;
+    border-radius: 8px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* Flash animation when a pub is auto-moved between waves */
+@keyframes wave-move-flash {
+    0%   { outline: 2px solid var(--headline); outline-offset: 2px; }
+    60%  { outline: 2px solid var(--headline); outline-offset: 2px; }
+    100% { outline: none; }
+}
+.wave-move-flash {
+    animation: wave-move-flash 0.7s ease-out forwards;
+}
+
+/* Inline move-notice toast */
+.wave-move-notice {
+    font-size: 0.73rem;
+    color: var(--highlight-2);
+    font-style: italic;
+    margin-top: 4px;
+    padding: 4px 8px;
+    background: #dde4ee;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+
+/* ═══════════════════════════════════════════════
+   TIMING SCHEDULE CARD
+   ═══════════════════════════════════════════════ */
+
+.timing-schedule-card {
+    background: white;
+    border: 1px solid var(--grey-light);
+    border-left: 4px solid #7B8BA3;
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    font-size: 0.82rem;
+}
+.timing-schedule-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--highlight-2);
+    margin-bottom: 10px;
+}
+.timing-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 7px;
+    line-height: 1.4;
+}
+.timing-row-icon {
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+}
+.timing-row-label {
+    font-weight: 600;
+    color: var(--headline);
+    min-width: 130px;
+    flex-shrink: 0;
+    font-size: 0.78rem;
+}
+.timing-row-value {
+    color: var(--body-text);
+    font-size: 0.8rem;
+}
+.timing-row-followup {
+    margin-top: 3px;
+    padding-top: 7px;
+    border-top: 1px solid var(--grey-lightest);
+    width: 100%;
+    font-size: 0.77rem;
+    color: var(--grey-medium);
+    font-style: italic;
+}
+
+
+/* ═══════════════════════════════════════════════
+   PRESS RELEASE & PR COORDINATION SECTION
+   ═══════════════════════════════════════════════ */
+
+.pr-wire-section {
+    background: white;
+    border: 1px solid var(--grey-light);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 28px;
+}
+.pr-wire-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+    background: #f7f4fb;
+    border-bottom: 1px solid var(--grey-light);
+    transition: background 0.1s;
+}
+.pr-wire-header:hover { background: #f0edf5; }
+.pr-wire-title {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--headline);
+    flex: 1;
+}
+.pr-wire-subtitle {
+    font-size: 0.75rem;
+    color: var(--grey-medium);
+}
+.pr-wire-body {
+    display: none;
+    padding: 0 20px 20px;
+}
+.pr-wire-section.open .pr-wire-body { display: block; }
+.pr-wire-section.open .chevron { transform: rotate(180deg); }
+
+.pr-subsection {
+    margin-top: 18px;
+}
+.pr-subsection-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.press-release-text {
+    background: var(--table-shade);
+    border: 1px solid var(--grey-light);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: 'Georgia', serif;
+    font-size: 0.83rem;
+    line-height: 1.7;
+    color: var(--body-text);
+    white-space: pre-wrap;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.pr-firm-memo-box {
+    background: #fdf6e8;
+    border: 1px solid #e0c97a;
+    border-left: 4px solid #c8993a;
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--body-text);
+    white-space: pre-wrap;
+}
+
+.embargo-protocol-box {
+    background: #eef0f5;
+    border: 1px solid #c8cfe0;
+    border-left: 4px solid var(--highlight-2);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    color: var(--body-text);
+    white-space: pre-wrap;
+}
+
+.wire-timing-note {
+    background: var(--table-shade);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    color: var(--grey-medium);
+    font-style: italic;
+    margin-top: 6px;
+}
+
+.copy-pr-btn {
+    margin-top: 10px;
+    background: var(--headline);
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+.copy-pr-btn:hover { background: #3a2742; }
+.copy-pr-btn.copied { background: var(--success); }
+
+/* Launch date field */
+.launch-date-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+input[type="date"] {
+    border: 1px solid var(--grey-light);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    color: var(--body-text);
+    background: var(--table-shade);
+    transition: border-color 0.2s;
+    width: 100%;
+    max-width: 220px;
+}
+input[type="date"]:focus { outline: none; border-color: var(--highlight-2); background: white; }
