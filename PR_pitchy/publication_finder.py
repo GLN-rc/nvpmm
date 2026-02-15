@@ -209,12 +209,37 @@ class PublicationFinder:
                     desc_soup = BeautifulSoup(description.get_text(strip=True), "html.parser")
                     desc_text = desc_soup.get_text(strip=True)[:300]
 
+                # Extract author/byline — try multiple RSS formats
+                author = None
+                # Standard RSS <author>
+                author_tag = item.find("author")
+                if author_tag:
+                    author = author_tag.get_text(strip=True)
+                # Dublin Core <dc:creator> — most common in WordPress/Drupal feeds
+                if not author:
+                    dc_creator = item.find("dc:creator") or item.find("creator")
+                    if dc_creator:
+                        author = dc_creator.get_text(strip=True)
+                # Media RSS <media:credit>
+                if not author:
+                    media_credit = item.find("media:credit") or item.find("credit")
+                    if media_credit:
+                        author = media_credit.get_text(strip=True)
+                # Sanitize email+name format: "foo@bar.com (Jane Smith)" → "Jane Smith"
+                if author and "(" in author and "@" in author:
+                    match = re.search(r'\(([^)]+)\)', author)
+                    author = match.group(1) if match else author.split("(")[-1].rstrip(")")
+                # Strip bare email addresses (no name value)
+                if author and "@" in author and "(" not in author:
+                    author = None
+
                 if title_text:
                     articles.append({
                         "title": title_text,
                         "url": link_text,
                         "summary": desc_text,
                         "date": pub_date.get_text(strip=True) if pub_date else "",
+                        "author": author or "",
                         "publication": publication["name"],
                         "domain": publication["domain"],
                         "beat": publication["beat"],
@@ -267,6 +292,7 @@ class PublicationFinder:
                 "audience": pub["audience"],
                 "description": pub["description"],
                 "recent_headlines": [a["title"] for a in articles],
+                "known_authors": list(set(a["author"] for a in articles if a.get("author"))),
                 "article_count": len(articles),
             })
 

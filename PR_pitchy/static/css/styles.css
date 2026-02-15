@@ -564,3 +564,203 @@ textarea:focus { outline: none; border-color: var(--highlight-2); background: wh
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
+
+
+/* ═══════════════════════════════════════════════
+   CAMPAIGN WAVE SECTIONS
+   ═══════════════════════════════════════════════ */
+
+.campaign-summary-banner {
+    background: white;
+    border: 1px solid var(--grey-light);
+    border-left: 4px solid var(--highlight-2);
+    border-radius: 0 10px 10px 0;
+    padding: 14px 18px;
+    margin-bottom: 28px;
+}
+.campaign-summary-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--highlight-2);
+    margin-bottom: 4px;
+}
+.campaign-summary-text {
+    font-size: 0.88rem;
+    color: var(--body-text);
+    line-height: 1.55;
+}
+
+/* Wave section wrapper */
+.wave-section { margin-bottom: 36px; }
+
+.wave-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.wave-badge {
+    font-family: var(--font-heading);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 12px;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+.wave-badge-1 { background: #e8e4ef; color: var(--headline); }
+.wave-badge-2 { background: #dde4ee; color: #4a5e7a; }
+.wave-badge-3 { background: #f0eae9; color: #7a5058; }
+
+.wave-title {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--headline);
+}
+.wave-timing {
+    font-size: 0.78rem;
+    color: var(--grey-medium);
+    font-style: italic;
+    margin-left: auto;
+}
+.wave-divider {
+    height: 1px;
+    background: var(--grey-light);
+    margin-bottom: 14px;
+}
+
+/* Wave 1 contingency callout */
+.contingency-box {
+    background: #fdf6e8;
+    border: 1px solid #e0c97a;
+    border-left: 4px solid #c8993a;
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    font-size: 0.82rem;
+    color: var(--body-text);
+}
+.contingency-box-title {
+    font-weight: 700;
+    color: #9a7030;
+    font-size: 0.73rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+}
+.contingency-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+.contingency-trigger {
+    font-weight: 600;
+    color: #9a7030;
+    flex-shrink: 0;
+    min-width: 170px;
+}
+.contingency-action { color: var(--body-text); }
+
+/* Wave 1 exclusive offer highlight */
+.exclusive-offer-box {
+    background: #e8e4ef;
+    border-left: 3px solid var(--headline);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px;
+    margin-top: 8px;
+    margin-bottom: 10px;
+    font-size: 0.82rem;
+    color: var(--headline);
+    font-weight: 500;
+}
+.exclusive-offer-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    color: var(--headline);
+    opacity: 0.65;
+}
+
+/* Wave 2 coordination note */
+.wave-2-note {
+    background: #dde4ee;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    font-size: 0.81rem;
+    color: #4a5e7a;
+    line-height: 1.45;
+}
+
+/* Wave 3 strategy note */
+.wave-strategy-note {
+    background: #f0eae9;
+    border: 1px solid #d9c4c7;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    font-size: 0.82rem;
+    color: #7a5058;
+    line-height: 1.45;
+}
+.wave-strategy-note-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 5px;
+    color: #7a5058;
+    opacity: 0.8;
+}
+
+/* Angle note per target card */
+.angle-note-box {
+    background: var(--table-shade);
+    border-left: 3px solid var(--highlight-2);
+    border-radius: 0 6px 6px 0;
+    padding: 8px 12px;
+    font-size: 0.81rem;
+    color: var(--body-text);
+    margin-top: 10px;
+    margin-bottom: 4px;
+    line-height: 1.45;
+}
+.angle-note-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--highlight-2);
+    margin-bottom: 3px;
+}
+
+/* Format suggestion tag (Wave 3) */
+.format-suggestion-tag {
+    display: inline-block;
+    background: #f0eae9;
+    color: #7a5058;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 10px;
+    margin-top: 4px;
+}
+
+/* No wave 1 notice */
+.no-wave1-notice {
+    background: var(--grey-lightest);
+    border: 1px dashed var(--grey-light);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 0.83rem;
+    color: var(--grey-medium);
+    font-style: italic;
+    margin-bottom: 10px;
+}

@@ -120,12 +120,20 @@ async def generate_pitches(
         recent_headlines=recent_articles,
     )
 
+    waves = result.get("waves", {})
     return {
         "status": "success",
         "news_analysis": result["news_analysis"],
-        "targets": result["targets"],
+        "campaign_plan": result.get("campaign_plan", {}),
+        "waves": waves,
+        "all_targets": result.get("all_targets", []),
         "publication_count": len(pub_summaries),
         "articles_scanned": len(recent_articles),
+        "wave_counts": {
+            "wave_1": 1 if waves.get("wave_1") else 0,
+            "wave_2": len(waves.get("wave_2", [])),
+            "wave_3": len(waves.get("wave_3", [])),
+        }
     }
 
 
