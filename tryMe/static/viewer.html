@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tryMe Demo</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/viewer.css">
+</head>
+<body>
+
+<!-- ── PERSONA GATE ────────────────────────────────────────── -->
+<div class="persona-gate" id="persona-gate">
+    <div class="persona-card">
+        <div class="persona-logo">▶</div>
+        <h1 id="pg-demo-title">Loading…</h1>
+        <p class="demo-desc" id="pg-demo-desc"></p>
+        <h2>Who are you?</h2>
+        <div class="persona-select" id="pg-personas">
+            <!-- populated by JS -->
+        </div>
+        <button class="btn btn-primary btn-lg" style="width:100%;" onclick="viewer.startDemo()">
+            Start Demo →
+        </button>
+    </div>
+</div>
+
+<!-- ── MAIN VIEWER ─────────────────────────────────────────── -->
+<div class="viewer-layout" id="viewer-layout" style="display:none;">
+
+    <!-- Top bar -->
+    <div class="viewer-topbar">
+        <div class="viewer-topbar-left">
+            <div class="viewer-logo"><span>try</span>Me</div>
+            <div style="width:1px;height:20px;background:var(--border-light);"></div>
+            <div class="viewer-demo-title" id="vt-title"></div>
+        </div>
+        <div class="viewer-topbar-right">
+            <div class="progress-pills" id="progress-pills"></div>
+            <div class="step-label" id="step-label"></div>
+            <div class="persona-badge" id="persona-badge" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- Stage -->
+    <div class="viewer-stage" id="viewer-stage">
+
+        <!-- Tooltip banner -->
+        <div class="step-tooltip-banner" id="tooltip-banner"></div>
+
+        <!-- No steps placeholder -->
+        <div class="no-steps-screen" id="no-steps-screen" style="display:none;">
+            <div class="icon">🎬</div>
+            <p>This demo has no steps yet. Open the editor to add some.</p>
+            <a href="/" class="btn btn-secondary">← Back to demos</a>
+        </div>
+
+        <!-- Screenshot + hotspot overlay -->
+        <div class="screenshot-container" id="screenshot-container" style="display:none;">
+            <img id="demo-img" src="" alt="Demo screenshot" draggable="false">
+            <div class="hotspot-overlay" id="hotspot-overlay"></div>
+        </div>
+    </div>
+
+    <!-- Bottom nav -->
+    <div class="viewer-navbar">
+        <button class="nav-back" id="nav-back" onclick="viewer.goBack()" disabled>← Back</button>
+        <div class="nav-step-display" id="nav-step-display">—</div>
+        <button class="nav-forward" id="nav-forward" onclick="viewer.goForward()">Forward →</button>
+    </div>
+</div>
+
+<!-- ── COMPLETION SCREEN ───────────────────────────────────── -->
+<div class="completion-screen" id="completion-screen">
+    <div class="completion-icon">🎉</div>
+    <h2>You've finished the demo!</h2>
+    <p id="completion-message">Thanks for exploring — you now know the key workflows. Ready to get started?</p>
+    <div class="completion-actions">
+        <button class="btn btn-secondary btn-lg" onclick="viewer.restart()">↩ Replay</button>
+        <a href="/" class="btn btn-ghost btn-lg">← All Demos</a>
+    </div>
+</div>
+
+<script src="/static/js/viewer.js"></script>
+</body>
+</html>

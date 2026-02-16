@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tryMe Editor</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/editor.css">
+</head>
+<body>
+
+<div class="editor-layout" id="editor-layout">
+
+    <!-- TOP BAR -->
+    <div class="editor-topbar">
+        <div class="topbar-left">
+            <a href="/" class="back-link">← All Demos</a>
+            <div class="separator" style="width:1px;height:20px;background:var(--border-light);"></div>
+            <input type="text" class="demo-title-input" id="demo-title-input"
+                   placeholder="Untitled Demo" value=""
+                   onblur="editor.saveDemoTitle(this.value)">
+        </div>
+        <div class="topbar-right">
+            <span class="step-counter" id="step-counter">0 steps</span>
+            <button class="btn btn-ghost btn-sm" onclick="editor.openSettings()">⚙ Settings</button>
+            <button class="btn btn-secondary btn-sm" onclick="editor.copyViewerLink()">🔗 Copy Link</button>
+            <a id="preview-btn" class="btn btn-primary btn-sm" href="#" target="_blank">▶ Preview</a>
+        </div>
+    </div>
+
+    <!-- LEFT: Step list -->
+    <div class="step-sidebar">
+        <div class="step-sidebar-header">Steps</div>
+        <div class="step-list" id="step-list">
+            <!-- populated by JS -->
+        </div>
+        <div class="step-sidebar-footer">
+            <button class="btn btn-primary" style="width:100%;" onclick="editor.addStep()">+ Add Step</button>
+        </div>
+    </div>
+
+    <!-- CENTER: Canvas editor -->
+    <div class="canvas-area">
+        <div class="canvas-toolbar">
+            <label class="upload-label" for="screenshot-upload">
+                📷 Replace Screenshot
+            </label>
+            <input type="file" id="screenshot-upload" accept="image/*" style="display:none"
+                   onchange="editor.handleScreenshotUpload(this)">
+            <div class="separator"></div>
+            <button class="tool-btn active" id="tool-draw" onclick="editor.setTool('draw')" title="Draw hotspot">
+                ✏ Draw Hotspot
+            </button>
+            <button class="tool-btn" id="tool-select" onclick="editor.setTool('select')" title="Select hotspot">
+                ↖ Select
+            </button>
+            <div class="separator"></div>
+            <span class="hint-text" id="canvas-hint">Click and drag on the screenshot to add a hotspot</span>
+        </div>
+
+        <div class="canvas-viewport" id="canvas-viewport">
+            <div class="no-screenshot" id="no-screenshot">
+                <div class="icon">📸</div>
+                <p>No screenshot yet — upload one to get started</p>
+                <label class="btn btn-primary" for="screenshot-upload">Upload Screenshot</label>
+            </div>
+            <div class="canvas-container" id="canvas-container" style="display:none;">
+                <img id="canvas-img" src="" alt="Step screenshot" draggable="false">
+                <canvas id="hotspot-canvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Step meta bar -->
+        <div class="step-meta-bar">
+            <div class="field-group" style="flex:1">
+                <label>Step Title</label>
+                <input type="text" id="step-title-input" placeholder="e.g. Click the Dashboard button"
+                       onblur="editor.saveStepMeta()">
+            </div>
+            <div class="field-group" style="flex:2">
+                <label>Tooltip / Instruction shown to viewer</label>
+                <textarea id="step-tooltip-input" placeholder="What should the viewer do here? e.g. 'Click on Dashboard to see your analytics overview.'"
+                          onblur="editor.saveStepMeta()"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Hotspot panel -->
+    <div class="hotspot-panel">
+        <div class="hotspot-panel-header">
+            <div class="hotspot-panel-title">Hotspots</div>
+            <span id="hotspot-count" style="font-size:12px;color:var(--text-muted);">0</span>
+        </div>
+        <div class="hotspot-list-section" id="hotspot-list">
+            <!-- populated by JS -->
+        </div>
+    </div>
+
+</div>
+
+<!-- Demo Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Demo Settings</div>
+            <button class="modal-close" onclick="editor.closeSettings()">×</button>
+        </div>
+        <div class="field-group">
+            <label>Title</label>
+            <input type="text" id="settings-title" placeholder="Demo title">
+        </div>
+        <div class="field-group">
+            <label>Description</label>
+            <textarea id="settings-desc" placeholder="What does this demo show?"></textarea>
+        </div>
+        <div class="field-group">
+            <label>Target Personas</label>
+            <div class="persona-tags" id="settings-personas"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="editor.closeSettings()">Cancel</button>
+            <button class="btn btn-primary" onclick="editor.saveSettings()">Save Settings</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="/static/js/editor.js"></script>
+</body>
+</html>

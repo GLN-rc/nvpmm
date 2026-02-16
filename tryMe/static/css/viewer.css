@@ -1,0 +1,231 @@
+/* ══════════════════════════════════════════════════════════════
+   tryMe — Viewer styles
+   ══════════════════════════════════════════════════════════════ */
+
+html, body { height: 100%; overflow: hidden; background: #08080f; }
+
+/* ── Persona gate screen ─────────────────────────────────────── */
+.persona-gate {
+    position: fixed; inset: 0; z-index: 500;
+    background: var(--bg-dark);
+    display: flex; align-items: center; justify-content: center;
+}
+.persona-gate.hidden { display: none; }
+
+.persona-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px 36px;
+    width: 460px; max-width: 95vw;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+.persona-logo {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: var(--brand-primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; margin: 0 auto 20px;
+}
+.persona-card h1 {
+    font-size: 20px; font-weight: 800; margin-bottom: 6px;
+}
+.persona-card .demo-desc {
+    font-size: 13px; color: var(--text-secondary); margin-bottom: 28px; line-height: 1.6;
+}
+.persona-card h2 {
+    font-size: 13px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;
+}
+.persona-select {
+    display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; text-align: left;
+}
+.persona-option {
+    padding: 10px 14px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--bg-card);
+    cursor: pointer; font-size: 13px; color: var(--text-primary);
+    transition: var(--transition); display: flex; align-items: center; gap: 8px;
+}
+.persona-option:hover { border-color: var(--brand-light); background: var(--bg-card-hover); }
+.persona-option.selected { border-color: var(--brand-primary); background: rgba(108,92,231,0.15); color: var(--brand-light); }
+.persona-option .check { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--grey-medium); flex-shrink: 0; transition: var(--transition); }
+.persona-option.selected .check { background: var(--brand-primary); border-color: var(--brand-primary); }
+
+/* ── Main viewer layout ──────────────────────────────────────── */
+.viewer-layout {
+    display: grid;
+    grid-template-rows: 52px 1fr 60px;
+    height: 100vh;
+}
+
+/* ── Viewer top bar ──────────────────────────────────────────── */
+.viewer-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+    background: rgba(26,25,40,0.95);
+    border-bottom: 1px solid var(--border-light);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+}
+.viewer-topbar-left  { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.viewer-topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+.viewer-logo { font-size: 14px; font-weight: 800; color: var(--text-primary); }
+.viewer-logo span { color: var(--brand-light); }
+
+.viewer-demo-title {
+    font-size: 14px; font-weight: 600; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;
+}
+
+.progress-pills {
+    display: flex; gap: 4px; align-items: center;
+}
+.progress-pill {
+    width: 24px; height: 4px; border-radius: 2px;
+    background: var(--grey-dark); transition: background var(--transition);
+}
+.progress-pill.done    { background: var(--brand-primary); }
+.progress-pill.current { background: var(--brand-light); }
+
+.step-label { font-size: 12px; color: var(--text-muted); }
+
+.persona-badge {
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    background: rgba(0,206,201,0.12); color: var(--accent);
+}
+
+/* ── Viewer stage ────────────────────────────────────────────── */
+.viewer-stage {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: #06060e;
+}
+
+/* Tooltip banner */
+.step-tooltip-banner {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 20;
+    background: rgba(26,25,40,0.95); backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 20px;
+    font-size: 14px; color: var(--text-primary);
+    max-width: 580px; text-align: center; line-height: 1.5;
+    box-shadow: var(--shadow);
+    opacity: 0; transform: translateX(-50%) translateY(-6px);
+    transition: all 0.22s ease;
+}
+.step-tooltip-banner.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Screenshot container */
+.screenshot-container {
+    position: relative; display: inline-block;
+    max-width: 100%; max-height: 100%;
+}
+.screenshot-container img {
+    display: block;
+    max-width: 100%; max-height: calc(100vh - 112px);
+    object-fit: contain;
+    border-radius: 4px;
+    user-select: none;
+}
+
+/* Hotspot overlay */
+.hotspot-overlay {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+}
+.hs-region {
+    position: absolute;
+    border: 2px solid rgba(162,155,254,0.7);
+    background: rgba(108,92,231,0.12);
+    border-radius: 4px;
+    pointer-events: all;
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition);
+    animation: pulse-hs 2.4s ease-in-out infinite;
+}
+.hs-region:hover {
+    background: rgba(108,92,231,0.28);
+    border-color: var(--brand-light);
+    animation: none;
+}
+@keyframes pulse-hs {
+    0%, 100% { background: rgba(108,92,231,0.08); }
+    50%       { background: rgba(108,92,231,0.22); }
+}
+
+/* Hotspot tooltip popover */
+.hs-tooltip {
+    position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26,25,40,0.98); backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    font-size: 12px; color: var(--text-primary);
+    white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s;
+    z-index: 30;
+    box-shadow: var(--shadow-sm);
+}
+.hs-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 5px solid transparent; border-top-color: var(--border);
+}
+.hs-region:hover .hs-tooltip { opacity: 1; }
+
+/* Click ripple */
+@keyframes click-ripple {
+    0%   { transform: translate(-50%,-50%) scale(0); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(2.5); opacity: 0; }
+}
+.click-ripple {
+    position: fixed; width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(108,92,231,0.4); pointer-events: none; z-index: 999;
+    animation: click-ripple 0.45s ease-out forwards;
+}
+
+/* ── Bottom nav bar ──────────────────────────────────────────── */
+.viewer-navbar {
+    display: flex; align-items: center; justify-content: center;
+    gap: 16px;
+    background: rgba(26,25,40,0.95);
+    border-top: 1px solid var(--border-light);
+    backdrop-filter: blur(8px);
+    padding: 0 20px;
+}
+.nav-back, .nav-forward {
+    padding: 8px 18px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--text-secondary);
+    cursor: pointer; transition: var(--transition);
+}
+.nav-back:hover, .nav-forward:hover { border-color: var(--brand-light); color: var(--text-primary); }
+.nav-back:disabled, .nav-forward:disabled { opacity: 0.3; pointer-events: none; }
+.nav-step-display { font-size: 13px; color: var(--text-muted); min-width: 80px; text-align: center; }
+
+/* ── End / completion screen ─────────────────────────────────── */
+.completion-screen {
+    display: none;
+    position: fixed; inset: 0; z-index: 300;
+    background: var(--bg-dark);
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 20px; text-align: center; padding: 40px;
+}
+.completion-screen.visible { display: flex; }
+.completion-icon { font-size: 56px; }
+.completion-screen h2 { font-size: 28px; font-weight: 800; }
+.completion-screen p  { font-size: 15px; color: var(--text-secondary); max-width: 420px; line-height: 1.6; }
+.completion-actions { display: flex; gap: 12px; margin-top: 8px; }
+
+/* ── No-step placeholder ─────────────────────────────────────── */
+.no-steps-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; padding: 60px; text-align: center; color: var(--text-muted);
+    font-size: 14px;
+}
+.no-steps-screen .icon { font-size: 52px; }
