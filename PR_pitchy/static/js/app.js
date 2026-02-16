@@ -367,6 +367,17 @@ class PRPitchyApp {
         }
     }
 
+    // Extract pub name from a card's onclick attribute and unescape HTML entities
+    _pubNameFromCard(card, wave) {
+        const onclickStr = card.getAttribute('onclick') || '';
+        const m = onclickStr.match(new RegExp(`toggleSelection\\('${wave}',\\s*'([^']+)'\\)`));
+        if (!m) return null;
+        // Unescape HTML entities so names with & etc. match correctly against state sets
+        const txt = document.createElement('textarea');
+        txt.innerHTML = m[1];
+        return txt.value;
+    }
+
     _refreshCardVisuals() {
         // Derive the locked set: pubs in Wave 1 are locked from W2/W3
         const lockedByW1 = this.selectedWave1 ? new Set([this.selectedWave1]) : new Set();
@@ -382,27 +393,13 @@ class PRPitchyApp {
 
         // ── Wave 2 cards ──────────────────────────────────────
         document.querySelectorAll('[id^="selcard-wave2-"]').forEach(card => {
-            const slug = card.id.replace('selcard-wave2-', '');
-            let pubForCard = null;
-            // find which pub maps to this slug
-            // check all known pub names from state
-            for (const pub of [...this.selectedWave2, ...(this.selectedWave3), ...(this.selectedWave1 ? [this.selectedWave1] : [])]) {
-                if (this._slugify(pub) === slug) { pubForCard = pub; break; }
-            }
-            // Also scan card's onclick to extract pub name
-            if (!pubForCard) {
-                const onclickStr = card.getAttribute('onclick') || '';
-                const m = onclickStr.match(/toggleSelection\('wave2',\s*'([^']+)'\)/);
-                if (m) pubForCard = m[1];
-            }
+            const pubForCard = this._pubNameFromCard(card, 'wave2');
 
             card.classList.remove('selected', 'locked-by-wave');
-            // Remove any existing lock label
             const existingLabel = card.querySelector('.locked-wave-label');
             if (existingLabel) existingLabel.remove();
 
             if (pubForCard && lockedByW1.has(pubForCard)) {
-                // Locked — show grey + badge
                 card.classList.add('locked-by-wave');
                 const nameEl = card.querySelector('.select-card-name');
                 if (nameEl) {
@@ -418,11 +415,7 @@ class PRPitchyApp {
 
         // ── Wave 3 cards ──────────────────────────────────────
         document.querySelectorAll('[id^="selcard-wave3-"]').forEach(card => {
-            const slug = card.id.replace('selcard-wave3-', '');
-            let pubForCard = null;
-            const onclickStr = card.getAttribute('onclick') || '';
-            const m = onclickStr.match(/toggleSelection\('wave3',\s*'([^']+)'\)/);
-            if (m) pubForCard = m[1];
+            const pubForCard = this._pubNameFromCard(card, 'wave3');
 
             card.classList.remove('selected', 'locked-by-wave');
             const existingLabel = card.querySelector('.locked-wave-label');
