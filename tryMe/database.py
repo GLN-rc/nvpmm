@@ -35,30 +35,65 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS steps (
-                id          TEXT PRIMARY KEY,
-                demo_id     TEXT NOT NULL REFERENCES demos(id) ON DELETE CASCADE,
-                position    INTEGER NOT NULL,
-                title       TEXT NOT NULL DEFAULT '',
-                tooltip     TEXT DEFAULT '',
-                image_path  TEXT DEFAULT '',
-                created_at  REAL NOT NULL,
-                updated_at  REAL NOT NULL
+                id                  TEXT PRIMARY KEY,
+                demo_id             TEXT NOT NULL REFERENCES demos(id) ON DELETE CASCADE,
+                position            INTEGER NOT NULL,
+                title               TEXT NOT NULL DEFAULT '',
+                tooltip             TEXT DEFAULT '',
+                image_path          TEXT DEFAULT '',
+                notes               TEXT DEFAULT '',
+                banner_cta_label    TEXT DEFAULT '',
+                banner_cta_action   TEXT DEFAULT 'next',
+                banner_cta_target   TEXT DEFAULT NULL,
+                banner_pointer      TEXT DEFAULT 'none',
+                banner_x            REAL DEFAULT NULL,
+                banner_y            REAL DEFAULT NULL,
+                created_at          REAL NOT NULL,
+                updated_at          REAL NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS hotspots (
-                id             TEXT PRIMARY KEY,
-                step_id        TEXT NOT NULL REFERENCES steps(id) ON DELETE CASCADE,
-                label          TEXT DEFAULT '',
-                x              REAL NOT NULL,
-                y              REAL NOT NULL,
-                width          REAL NOT NULL,
-                height         REAL NOT NULL,
-                action_type    TEXT NOT NULL DEFAULT 'next',
-                action_target  TEXT DEFAULT NULL,
-                created_at     REAL NOT NULL
+                id                  TEXT PRIMARY KEY,
+                step_id             TEXT NOT NULL REFERENCES steps(id) ON DELETE CASCADE,
+                label               TEXT DEFAULT '',
+                x                   REAL NOT NULL,
+                y                   REAL NOT NULL,
+                width               REAL NOT NULL,
+                height              REAL NOT NULL,
+                action_type         TEXT NOT NULL DEFAULT 'next',
+                action_target       TEXT DEFAULT NULL,
+                beacon              INTEGER NOT NULL DEFAULT 0,
+                popover_label       TEXT DEFAULT '',
+                popover_cta_label   TEXT DEFAULT '',
+                popover_cta_action  TEXT DEFAULT 'next',
+                popover_cta_target  TEXT DEFAULT NULL,
+                created_at          REAL NOT NULL
             );
         """)
+
+        # ── Backwards-compatible migrations for existing DBs ──────────
+        _add_column_if_missing(conn, 'steps', 'notes',               "TEXT DEFAULT ''")
+        _add_column_if_missing(conn, 'steps', 'banner_cta_label',    "TEXT DEFAULT ''")
+        _add_column_if_missing(conn, 'steps', 'banner_cta_action',   "TEXT DEFAULT 'next'")
+        _add_column_if_missing(conn, 'steps', 'banner_cta_target',   "TEXT DEFAULT NULL")
+        _add_column_if_missing(conn, 'steps', 'banner_pointer',      "TEXT DEFAULT 'none'")
+        _add_column_if_missing(conn, 'steps', 'banner_x',            "REAL DEFAULT NULL")
+        _add_column_if_missing(conn, 'steps', 'banner_y',            "REAL DEFAULT NULL")
+        _add_column_if_missing(conn, 'steps', 'banner_hotspot_id',   "TEXT DEFAULT NULL")
+        _add_column_if_missing(conn, 'steps', 'tooltip_html',        "TEXT DEFAULT ''")
+        _add_column_if_missing(conn, 'hotspots', 'beacon',           "INTEGER NOT NULL DEFAULT 0")
+        _add_column_if_missing(conn, 'hotspots', 'popover_label',    "TEXT DEFAULT ''")
+        _add_column_if_missing(conn, 'hotspots', 'popover_cta_label',"TEXT DEFAULT ''")
+        _add_column_if_missing(conn, 'hotspots', 'popover_cta_action',"TEXT DEFAULT 'next'")
+        _add_column_if_missing(conn, 'hotspots', 'popover_cta_target',"TEXT DEFAULT NULL")
     conn.close()
+
+
+def _add_column_if_missing(conn, table: str, column: str, definition: str):
+    """Add a column to a table only if it doesn't already exist."""
+    existing = [row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -184,16 +219,24 @@ def get_steps_for_demo(demo_id: str) -> List[Dict[str, Any]]:
 
 
 def update_step(step_id: str, title: Optional[str] = None, tooltip: Optional[str] = None,
-                image_path: Optional[str] = None, position: Optional[int] = None) -> Optional[Dict[str, Any]]:
+                image_path: Optional[str] = None, position: Optional[int] = None,
+                notes: Optional[str] = None,
+                banner_cta_label: Optional[str] = None, banner_cta_action: Optional[str] = None,
+                banner_cta_target: Optional[str] = None, banner_pointer: Optional[str] = None,
+                banner_x: Optional[float] = None, banner_y: Optional[float] = None,
+                banner_hotspot_id: Optional[str] = None,
+                tooltip_html: Optional[str] = None) -> Optional[Dict[str, Any]]:
     fields, vals = [], []
-    if title is not None:
-        fields.append("title = ?"); vals.append(title)
-    if tooltip is not None:
-        fields.append("tooltip = ?"); vals.append(tooltip)
-    if image_path is not None:
-        fields.append("image_path = ?"); vals.append(image_path)
-    if position is not None:
-        fields.append("position = ?"); vals.append(position)
+    for col, val in [
+        ("title", title), ("tooltip", tooltip), ("image_path", image_path),
+        ("position", position), ("notes", notes),
+        ("banner_cta_label", banner_cta_label), ("banner_cta_action", banner_cta_action),
+        ("banner_cta_target", banner_cta_target), ("banner_pointer", banner_pointer),
+        ("banner_x", banner_x), ("banner_y", banner_y),
+        ("banner_hotspot_id", banner_hotspot_id), ("tooltip_html", tooltip_html),
+    ]:
+        if val is not None:
+            fields.append(f"{col} = ?"); vals.append(val)
     if not fields:
         return get_step(step_id)
     now = time.time()
@@ -234,14 +277,21 @@ def reorder_steps(demo_id: str, ordered_ids: List[str]) -> bool:
 # ══════════════════════════════════════════════════════════════════
 
 def create_hotspot(step_id: str, label: str, x: float, y: float, width: float, height: float,
-                   action_type: str = "next", action_target: Optional[str] = None) -> Dict[str, Any]:
+                   action_type: str = "next", action_target: Optional[str] = None,
+                   beacon: int = 0, popover_label: str = "",
+                   popover_cta_label: str = "", popover_cta_action: str = "next",
+                   popover_cta_target: Optional[str] = None) -> Dict[str, Any]:
     hotspot_id = str(uuid.uuid4())
     now = time.time()
     conn = _get_conn()
     with conn:
         conn.execute(
-            "INSERT INTO hotspots (id, step_id, label, x, y, width, height, action_type, action_target, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (hotspot_id, step_id, label, x, y, width, height, action_type, action_target, now)
+            """INSERT INTO hotspots
+               (id, step_id, label, x, y, width, height, action_type, action_target,
+                beacon, popover_label, popover_cta_label, popover_cta_action, popover_cta_target, created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (hotspot_id, step_id, label, x, y, width, height, action_type, action_target,
+             beacon, popover_label, popover_cta_label, popover_cta_action, popover_cta_target, now)
         )
     conn.close()
     return get_hotspot(hotspot_id)
@@ -265,10 +315,18 @@ def get_hotspots_for_step(step_id: str) -> List[Dict[str, Any]]:
 
 def update_hotspot(hotspot_id: str, label: Optional[str] = None, x: Optional[float] = None,
                    y: Optional[float] = None, width: Optional[float] = None, height: Optional[float] = None,
-                   action_type: Optional[str] = None, action_target: Optional[str] = None) -> Optional[Dict[str, Any]]:
+                   action_type: Optional[str] = None, action_target: Optional[str] = None,
+                   beacon: Optional[int] = None,
+                   popover_label: Optional[str] = None, popover_cta_label: Optional[str] = None,
+                   popover_cta_action: Optional[str] = None, popover_cta_target: Optional[str] = None) -> Optional[Dict[str, Any]]:
     fields, vals = [], []
-    for col, val in [("label", label), ("x", x), ("y", y), ("width", width), ("height", height),
-                     ("action_type", action_type), ("action_target", action_target)]:
+    for col, val in [
+        ("label", label), ("x", x), ("y", y), ("width", width), ("height", height),
+        ("action_type", action_type), ("action_target", action_target),
+        ("beacon", beacon), ("popover_label", popover_label),
+        ("popover_cta_label", popover_cta_label), ("popover_cta_action", popover_cta_action),
+        ("popover_cta_target", popover_cta_target),
+    ]:
         if val is not None:
             fields.append(f"{col} = ?"); vals.append(val)
     if not fields:
@@ -299,3 +357,65 @@ def get_demo_full(demo_id: str) -> Optional[Dict[str, Any]]:
         return None
     demo["steps"] = get_steps_for_demo(demo_id)
     return demo
+
+
+def clone_demo(source_demo_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Clone a demo: copy the demo record, all steps, all hotspots, and all image files.
+    Image files are physically copied into a new uploads/{new_demo_id}/ folder
+    so the clone is fully independent and won't break if the source is deleted.
+    Returns the new demo dict.
+    """
+    import storage as _storage
+    source = get_demo_full(source_demo_id)
+    if not source:
+        return None
+
+    now = time.time()
+    new_demo_id = str(uuid.uuid4())
+    personas_json = json.dumps(source.get("personas") or [])
+
+    # Copy image files first so we have the path mapping
+    path_map = _storage.copy_demo_uploads(source_demo_id, new_demo_id)
+
+    conn = _get_conn()
+    with conn:
+        # Clone the demo row
+        conn.execute(
+            "INSERT INTO demos (id, title, description, personas, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+            (new_demo_id, f"{source['title']} (Copy)", source.get("description", ""), personas_json, now, now)
+        )
+
+        # Clone each step and its hotspots
+        for step in source.get("steps", []):
+            new_step_id = str(uuid.uuid4())
+            old_img = step.get("image_path", "")
+            new_img = path_map.get(old_img, old_img)  # remap to copied file path
+            conn.execute(
+                """INSERT INTO steps
+                   (id, demo_id, position, title, tooltip, image_path, notes,
+                    banner_cta_label, banner_cta_action, banner_cta_target,
+                    banner_pointer, banner_x, banner_y, created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (new_step_id, new_demo_id, step["position"], step["title"],
+                 step.get("tooltip", ""), new_img, step.get("notes", ""),
+                 step.get("banner_cta_label", ""), step.get("banner_cta_action", "next"),
+                 step.get("banner_cta_target"), step.get("banner_pointer", "none"),
+                 step.get("banner_x"), step.get("banner_y"), now, now)
+            )
+            for hs in step.get("hotspots", []):
+                conn.execute(
+                    """INSERT INTO hotspots
+                       (id, step_id, label, x, y, width, height, action_type, action_target,
+                        beacon, popover_label, popover_cta_label, popover_cta_action,
+                        popover_cta_target, created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (str(uuid.uuid4()), new_step_id, hs.get("label", ""),
+                     hs["x"], hs["y"], hs["width"], hs["height"],
+                     hs.get("action_type", "next"), hs.get("action_target"),
+                     hs.get("beacon", 0), hs.get("popover_label", ""),
+                     hs.get("popover_cta_label", ""), hs.get("popover_cta_action", "next"),
+                     hs.get("popover_cta_target"), now)
+                )
+    conn.close()
+    return get_demo_full(new_demo_id)

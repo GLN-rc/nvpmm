@@ -148,6 +148,28 @@
     </div>
 </div>
 
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="delete-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" style="color:#e91e8c;">⚠ Delete Demo</div>
+            <button class="modal-close" onclick="closeDeleteModal()">×</button>
+        </div>
+        <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px;">
+            This will permanently delete the demo and all its screenshots.<br>
+            Type <strong id="delete-modal-name" style="color:var(--text-primary);"></strong> to confirm.
+        </p>
+        <div class="field-group">
+            <input type="text" id="delete-confirm-input" placeholder="Type demo title to confirm"
+                   oninput="document.getElementById('delete-confirm-btn').disabled = this.value !== _deletePendingTitle">
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn btn-danger" id="delete-confirm-btn" disabled onclick="confirmDeleteDemo()" style="background:#e91e8c;border-color:#e91e8c;color:#fff;">Delete Forever</button>
+        </div>
+    </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -202,6 +224,7 @@ function renderDemoCard(demo) {
         <div class="demo-card-actions">
             <a class="btn btn-secondary btn-sm" href="/editor/${demo.id}">✏️ Edit</a>
             <a class="btn btn-primary btn-sm" href="/demo/${demo.id}" target="_blank">▶ Preview</a>
+            <button class="btn btn-ghost btn-sm" onclick="cloneDemo('${demo.id}', this)" title="Clone demo">⧉</button>
             <button class="btn btn-ghost btn-sm" onclick="copyLink('${demo.id}')" title="Copy viewer link">🔗</button>
             <button class="btn btn-danger btn-sm" onclick="deleteDemo('${demo.id}', this)" title="Delete">🗑</button>
         </div>
@@ -253,12 +276,53 @@ async function submitNewDemo() {
     window.location.href = `/editor/${demo.id}`;
 }
 
-async function deleteDemo(demoId, btn) {
-    if (!confirm('Delete this demo and all its steps? This cannot be undone.')) return;
+async function cloneDemo(demoId, btn) {
     btn.disabled = true;
-    const res = await fetch(`/api/demos/${demoId}`, { method: 'DELETE' });
+    btn.textContent = '…';
+    const res = await fetch(`/api/demos/${demoId}/clone`, { method: 'POST' });
+    if (res.ok) {
+        const newDemo = await res.json();
+        showToast('Demo cloned!', 'success');
+        await loadDemos();
+        // Open the cloned demo in the editor
+        window.location.href = `/editor/${newDemo.id}`;
+    } else {
+        showToast('Clone failed', 'error');
+        btn.disabled = false;
+        btn.textContent = '⧉';
+    }
+}
+
+let _deletePendingId    = null;
+let _deletePendingTitle = null;
+
+function deleteDemo(demoId, btn) {
+    // Find the demo title from the card
+    const card  = btn.closest('.demo-card');
+    const title = card?.querySelector('.demo-card-title')?.textContent?.trim() || 'this demo';
+    _deletePendingId    = demoId;
+    _deletePendingTitle = title;
+    document.getElementById('delete-modal-name').textContent = title;
+    document.getElementById('delete-confirm-input').value = '';
+    document.getElementById('delete-confirm-btn').disabled = true;
+    document.getElementById('delete-modal').classList.add('open');
+    setTimeout(() => document.getElementById('delete-confirm-input').focus(), 80);
+}
+
+function closeDeleteModal() {
+    document.getElementById('delete-modal').classList.remove('open');
+    _deletePendingId = _deletePendingTitle = null;
+}
+
+async function confirmDeleteDemo() {
+    if (!_deletePendingId) return;
+    const btn = document.getElementById('delete-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    const res = await fetch(`/api/demos/${_deletePendingId}`, { method: 'DELETE' });
+    closeDeleteModal();
     if (res.ok) { showToast('Demo deleted', 'success'); loadDemos(); }
-    else { showToast('Delete failed', 'error'); btn.disabled = false; }
+    else { showToast('Delete failed', 'error'); }
 }
 
 function copyLink(demoId) {
@@ -285,12 +349,19 @@ function timeAgo(ts) {
     return `${Math.floor(sec/86400)}d ago`;
 }
 
-// Enter key submits modal
+// Keyboard shortcuts for modals
 document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && document.getElementById('new-demo-modal').classList.contains('open')) {
-        submitNewDemo();
+    if (e.key === 'Enter') {
+        if (document.getElementById('new-demo-modal').classList.contains('open')) submitNewDemo();
+        if (document.getElementById('delete-modal').classList.contains('open')) {
+            const btn = document.getElementById('delete-confirm-btn');
+            if (!btn.disabled) confirmDeleteDemo();
+        }
     }
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') {
+        closeModal();
+        closeDeleteModal();
+    }
 });
 
 init();

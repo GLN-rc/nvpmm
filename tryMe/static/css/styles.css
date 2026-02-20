@@ -3,31 +3,42 @@
    ══════════════════════════════════════════════════════════════ */
 
 :root {
-    --brand-primary:    #6C5CE7;
-    --brand-light:      #a29bfe;
-    --brand-dark:       #4a3ab5;
-    --accent:           #00cec9;
-    --accent-warm:      #fd79a8;
+    /* Brand purple — used sparingly, primary actions only */
+    --brand-primary:    #5a3fd8;
+    --brand-light:      #8b7eef;
+    --brand-dark:       #3d2aaa;
 
-    --bg-dark:          #0f0e17;
-    --bg-panel:         #1a1928;
-    --bg-card:          #22213a;
-    --bg-card-hover:    #2a2848;
-    --bg-input:         #1e1d33;
+    /* Hot pink — Replica signature accent */
+    --brand-pink:       #e91e8c;
+    --brand-pink-light: #f06ab5;
+    --brand-pink-dim:   rgba(233,30,140,0.15);
 
-    --grey-dark:        #3d3b5e;
-    --grey-medium:      #6e6c97;
-    --grey-light:       #a0a0c0;
-    --grey-lightest:    #d4d4e8;
+    /* Cyan — secondary accent */
+    --accent:           #0dcaff;
+    --accent-warm:      #f06ab5;
 
-    --text-primary:     #f0effe;
-    --text-secondary:   #a0a0c0;
-    --text-muted:       #6e6c97;
+    /* Backgrounds — dark navy base, grey panels (less purple) */
+    --bg-dark:          #0a0c12;
+    --bg-panel:         #14161e;
+    --bg-card:          #1e2028;
+    --bg-card-hover:    #252830;
+    --bg-input:         #191b22;
 
-    --border:           rgba(108, 92, 231, 0.2);
-    --border-light:     rgba(255,255,255,0.07);
-    --shadow:           0 4px 24px rgba(0,0,0,0.4);
-    --shadow-sm:        0 2px 8px rgba(0,0,0,0.3);
+    /* Greys — neutral, not purple-tinted */
+    --grey-dark:        #3a3d4a;
+    --grey-medium:      #6b6e7e;
+    --grey-light:       #9da0b0;
+    --grey-lightest:    #d0d3e0;
+
+    --text-primary:     #eef0f8;
+    --text-secondary:   #9da0b0;
+    --text-muted:       #6b6e7e;
+
+    /* Borders — grey not purple */
+    --border:           rgba(255,255,255,0.10);
+    --border-light:     rgba(255,255,255,0.06);
+    --shadow:           0 4px 24px rgba(0,0,0,0.5);
+    --shadow-sm:        0 2px 8px rgba(0,0,0,0.35);
 
     --radius:           12px;
     --radius-sm:        8px;
@@ -81,10 +92,10 @@ a:hover { color: var(--brand-primary); }
 .btn-ghost:hover { background: var(--bg-card); color: var(--text-primary); }
 
 .btn-danger {
-    background: transparent; color: #e17055;
-    border: 1px solid rgba(225,112,85,0.3);
+    background: transparent; color: var(--brand-pink);
+    border: 1px solid rgba(233,30,140,0.35);
 }
-.btn-danger:hover { background: rgba(225,112,85,0.12); }
+.btn-danger:hover { background: rgba(233,30,140,0.12); }
 
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-lg { padding: 11px 22px; font-size: 15px; }
@@ -117,10 +128,10 @@ textarea { resize: vertical; min-height: 72px; }
 
 label {
     display: block;
-    font-size: 12px; font-weight: 600;
+    font-size: 11px; font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 5px;
-    text-transform: uppercase; letter-spacing: 0.05em;
+    /* No all-caps globally — section headers use their own class */
 }
 
 .field-group { margin-bottom: 16px; }

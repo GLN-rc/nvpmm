@@ -3,62 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>tryMe Demo</title>
+    <title>Replica Demo</title>
     <link rel="stylesheet" href="/static/css/styles.css">
     <link rel="stylesheet" href="/static/css/viewer.css">
 </head>
 <body>
 
-<!-- ── PERSONA GATE ────────────────────────────────────────── -->
-<div class="persona-gate" id="persona-gate">
-    <div class="persona-card">
-        <div class="persona-logo">▶</div>
-        <h1 id="pg-demo-title">Loading…</h1>
-        <p class="demo-desc" id="pg-demo-desc"></p>
-        <h2>Who are you?</h2>
-        <div class="persona-select" id="pg-personas">
-            <!-- populated by JS -->
-        </div>
-        <button class="btn btn-primary btn-lg" style="width:100%;" onclick="viewer.startDemo()">
-            Start Demo →
-        </button>
-    </div>
-</div>
-
 <!-- ── MAIN VIEWER ─────────────────────────────────────────── -->
-<div class="viewer-layout" id="viewer-layout" style="display:none;">
+<div class="viewer-layout" id="viewer-layout">
 
     <!-- Top bar -->
     <div class="viewer-topbar">
         <div class="viewer-topbar-left">
-            <div class="viewer-logo"><span>try</span>Me</div>
-            <div style="width:1px;height:20px;background:var(--border-light);"></div>
+            <div class="viewer-logo">
+                <img src="/static/img/replica-logo.svg" alt="Replica" onerror="this.style.display='none'; document.getElementById('replica-wordmark').style.display='block'">
+                <span id="replica-wordmark" style="display:none; font-size:15px; font-weight:800; letter-spacing:-0.5px;">Replica</span>
+            </div>
+            <div class="viewer-topbar-divider"></div>
             <div class="viewer-demo-title" id="vt-title"></div>
         </div>
         <div class="viewer-topbar-right">
             <div class="progress-pills" id="progress-pills"></div>
             <div class="step-label" id="step-label"></div>
-            <div class="persona-badge" id="persona-badge" style="display:none;"></div>
+            <button class="restart-btn" onclick="viewer.restart()" title="Restart from beginning">↩ Restart</button>
         </div>
     </div>
 
     <!-- Stage -->
     <div class="viewer-stage" id="viewer-stage">
 
-        <!-- Tooltip banner -->
-        <div class="step-tooltip-banner" id="tooltip-banner"></div>
-
         <!-- No steps placeholder -->
         <div class="no-steps-screen" id="no-steps-screen" style="display:none;">
             <div class="icon">🎬</div>
-            <p>This demo has no steps yet. Open the editor to add some.</p>
-            <a href="/" class="btn btn-secondary">← Back to demos</a>
+            <p>This demo has no steps yet.</p>
         </div>
 
-        <!-- Screenshot + hotspot overlay -->
+        <!-- Screenshot + hotspot overlay + banner — all in the same coordinate space -->
         <div class="screenshot-container" id="screenshot-container" style="display:none;">
+            <!-- Back layer: preloads next image for seamless crossfade -->
+            <img id="demo-img-next" src="" alt="" draggable="false" aria-hidden="true"
+                 style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;border-radius:4px;opacity:0;pointer-events:none;">
             <img id="demo-img" src="" alt="Demo screenshot" draggable="false">
             <div class="hotspot-overlay" id="hotspot-overlay"></div>
+            <!-- Tooltip banner lives here so its left/top are in the same px space as hotspot % positions -->
+            <div class="step-tooltip-banner" id="tooltip-banner">
+                <span id="tooltip-text"></span>
+                <button class="tooltip-cta-btn hidden" id="tooltip-cta"></button>
+                <button class="tooltip-close-btn" id="tooltip-close-btn" title="Dismiss">×</button>
+            </div>
         </div>
     </div>
 
@@ -66,18 +58,23 @@
     <div class="viewer-navbar">
         <button class="nav-back" id="nav-back" onclick="viewer.goBack()" disabled>← Back</button>
         <div class="nav-step-display" id="nav-step-display">—</div>
-        <button class="nav-forward" id="nav-forward" onclick="viewer.goForward()">Forward →</button>
+        <button class="nav-forward" id="nav-forward" onclick="viewer.goForward()">Next →</button>
     </div>
 </div>
 
 <!-- ── COMPLETION SCREEN ───────────────────────────────────── -->
 <div class="completion-screen" id="completion-screen">
-    <div class="completion-icon">🎉</div>
-    <h2>You've finished the demo!</h2>
-    <p id="completion-message">Thanks for exploring — you now know the key workflows. Ready to get started?</p>
+    <div class="completion-logo">
+        <img src="/static/img/replica-logo.svg" alt="Replica" onerror="this.style.display='none'">
+    </div>
+    <h2>You've seen what Replica can do.</h2>
+    <p>Ready to put it to work for your team?</p>
     <div class="completion-actions">
-        <button class="btn btn-secondary btn-lg" onclick="viewer.restart()">↩ Replay</button>
-        <a href="/" class="btn btn-ghost btn-lg">← All Demos</a>
+        <a href="https://replicacyber.com/request-a-demo/" target="_blank" class="btn btn-primary btn-lg">Book a Demo →</a>
+        <button class="btn btn-ghost btn-lg" onclick="viewer.restart()">↩ Replay</button>
+    </div>
+    <div class="completion-secondary">
+        <a href="https://replicacyber.com/tag/blog/" target="_blank">Read our latest insights →</a>
     </div>
 </div>
 

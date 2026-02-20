@@ -7,7 +7,7 @@ import os
 import shutil
 from typing import Optional
 
-UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+UPLOADS_DIR = os.path.join(os.path.expanduser("~"), "tryMe-uploads")
 
 
 def ensure_uploads_dir():
@@ -45,6 +45,25 @@ def delete_step_screenshot(demo_id: str, step_id: str):
                 os.remove(os.path.join(dir_path, fname))
             except OSError:
                 pass
+
+
+def copy_demo_uploads(source_demo_id: str, dest_demo_id: str) -> dict:
+    """
+    Copy all screenshot files from uploads/{source_demo_id}/ to uploads/{dest_demo_id}/.
+    Returns a mapping of old filename → new path so the DB can be updated.
+    """
+    src_dir  = demo_dir(source_demo_id)
+    dest_dir = demo_dir(dest_demo_id)
+    mapping  = {}   # old /uploads/src/file.ext → new /uploads/dest/file.ext
+    if not os.path.isdir(src_dir):
+        return mapping
+    os.makedirs(dest_dir, exist_ok=True)
+    for fname in os.listdir(src_dir):
+        src_path  = os.path.join(src_dir, fname)
+        dest_path = os.path.join(dest_dir, fname)
+        shutil.copy2(src_path, dest_path)
+        mapping[f"/uploads/{source_demo_id}/{fname}"] = f"/uploads/{dest_demo_id}/{fname}"
+    return mapping
 
 
 def delete_demo_uploads(demo_id: str):

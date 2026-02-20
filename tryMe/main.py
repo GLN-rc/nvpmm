@@ -32,7 +32,7 @@ PERSONAS = [
 ]
 
 STATIC_DIR  = os.path.join(os.path.dirname(__file__), "static")
-UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+UPLOADS_DIR = os.path.join(os.path.expanduser("~"), "tryMe-uploads")
 
 app = FastAPI(title="tryMe — Interactive Demo Builder")
 
@@ -121,6 +121,16 @@ def get_demo_full(demo_id: str):
         raise HTTPException(404, "Demo not found")
     return demo
 
+@app.post("/api/demos/{demo_id}/clone", status_code=201)
+def clone_demo(demo_id: str):
+    demo = db.get_demo_full(demo_id)
+    if not demo:
+        raise HTTPException(404, "Demo not found")
+    new_demo = db.clone_demo(demo_id)
+    if not new_demo:
+        raise HTTPException(500, "Clone failed")
+    return new_demo
+
 
 # ══════════════════════════════════════════════════════════════════
 # API — Steps
@@ -157,6 +167,15 @@ async def update_step(
     title: Optional[str] = Form(default=None),
     tooltip: Optional[str] = Form(default=None),
     position: Optional[int] = Form(default=None),
+    notes: Optional[str] = Form(default=None),
+    banner_cta_label: Optional[str] = Form(default=None),
+    banner_cta_action: Optional[str] = Form(default=None),
+    banner_cta_target: Optional[str] = Form(default=None),
+    banner_pointer: Optional[str] = Form(default=None),
+    banner_x: Optional[float] = Form(default=None),
+    banner_y: Optional[float] = Form(default=None),
+    banner_hotspot_id: Optional[str] = Form(default=None),
+    tooltip_html: Optional[str] = Form(default=None),
     image: Optional[UploadFile] = File(default=None),
 ):
     step = db.get_step(step_id)
@@ -164,14 +183,19 @@ async def update_step(
         raise HTTPException(404, "Step not found")
 
     if image and image.filename:
-        # Remove old screenshot before saving new one
         storage.delete_step_screenshot(demo_id, step_id)
         file_bytes = await image.read()
         image_path = storage.save_screenshot(demo_id, step_id, file_bytes, image.filename)
     else:
         image_path = None
 
-    return db.update_step(step_id, title=title, tooltip=tooltip, image_path=image_path, position=position)
+    return db.update_step(
+        step_id, title=title, tooltip=tooltip, image_path=image_path, position=position,
+        notes=notes, banner_cta_label=banner_cta_label, banner_cta_action=banner_cta_action,
+        banner_cta_target=banner_cta_target, banner_pointer=banner_pointer,
+        banner_x=banner_x, banner_y=banner_y,
+        banner_hotspot_id=banner_hotspot_id, tooltip_html=tooltip_html,
+    )
 
 
 @app.delete("/api/demos/{demo_id}/steps/{step_id}")
@@ -203,7 +227,10 @@ def create_hotspot(step_id: str, body: HotspotCreate):
     return db.create_hotspot(
         step_id=step_id, label=body.label,
         x=body.x, y=body.y, width=body.width, height=body.height,
-        action_type=body.action_type, action_target=body.action_target
+        action_type=body.action_type, action_target=body.action_target,
+        beacon=body.beacon, popover_label=body.popover_label,
+        popover_cta_label=body.popover_cta_label, popover_cta_action=body.popover_cta_action,
+        popover_cta_target=body.popover_cta_target,
     )
 
 @app.patch("/api/steps/{step_id}/hotspots/{hotspot_id}")
@@ -214,7 +241,10 @@ def update_hotspot(step_id: str, hotspot_id: str, body: HotspotUpdate):
     return db.update_hotspot(
         hotspot_id, label=body.label, x=body.x, y=body.y,
         width=body.width, height=body.height,
-        action_type=body.action_type, action_target=body.action_target
+        action_type=body.action_type, action_target=body.action_target,
+        beacon=body.beacon, popover_label=body.popover_label,
+        popover_cta_label=body.popover_cta_label, popover_cta_action=body.popover_cta_action,
+        popover_cta_target=body.popover_cta_target,
     )
 
 @app.delete("/api/steps/{step_id}/hotspots/{hotspot_id}")

@@ -3,53 +3,14 @@
    ══════════════════════════════════════════════════════════════ */
 
 html, body { height: 100%; overflow: hidden; background: #08080f; }
+.hidden { display: none !important; }
 
-/* ── Persona gate screen ─────────────────────────────────────── */
-.persona-gate {
-    position: fixed; inset: 0; z-index: 500;
-    background: var(--bg-dark);
-    display: flex; align-items: center; justify-content: center;
-}
-.persona-gate.hidden { display: none; }
+/* ── Viewer logo ─────────────────────────────────────────────── */
+.viewer-logo img { height: 26px; width: auto; display: block; }
+.viewer-topbar-divider { width: 1px; height: 20px; background: var(--border-light); }
 
-.persona-card {
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 40px 36px;
-    width: 460px; max-width: 95vw;
-    box-shadow: var(--shadow);
-    text-align: center;
-}
-.persona-logo {
-    width: 48px; height: 48px; border-radius: 12px;
-    background: var(--brand-primary);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 26px; margin: 0 auto 20px;
-}
-.persona-card h1 {
-    font-size: 20px; font-weight: 800; margin-bottom: 6px;
-}
-.persona-card .demo-desc {
-    font-size: 13px; color: var(--text-secondary); margin-bottom: 28px; line-height: 1.6;
-}
-.persona-card h2 {
-    font-size: 13px; font-weight: 700; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;
-}
-.persona-select {
-    display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px; text-align: left;
-}
-.persona-option {
-    padding: 10px 14px; border-radius: var(--radius-sm);
-    border: 1px solid var(--border); background: var(--bg-card);
-    cursor: pointer; font-size: 13px; color: var(--text-primary);
-    transition: var(--transition); display: flex; align-items: center; gap: 8px;
-}
-.persona-option:hover { border-color: var(--brand-light); background: var(--bg-card-hover); }
-.persona-option.selected { border-color: var(--brand-primary); background: rgba(108,92,231,0.15); color: var(--brand-light); }
-.persona-option .check { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--grey-medium); flex-shrink: 0; transition: var(--transition); }
-.persona-option.selected .check { background: var(--brand-primary); border-color: var(--brand-primary); }
+/* ── Completion logo ─────────────────────────────────────────── */
+.completion-logo img { height: 44px; width: auto; margin-bottom: 8px; }
 
 /* ── Main viewer layout ──────────────────────────────────────── */
 .viewer-layout {
@@ -85,15 +46,20 @@ html, body { height: 100%; overflow: hidden; background: #08080f; }
     width: 24px; height: 4px; border-radius: 2px;
     background: var(--grey-dark); transition: background var(--transition);
 }
-.progress-pill.done    { background: var(--brand-primary); }
-.progress-pill.current { background: var(--brand-light); }
+.progress-pill.done    { background: var(--brand-pink); }
+.progress-pill.current { background: var(--brand-pink-light); }
 
 .step-label { font-size: 12px; color: var(--text-muted); }
 
-.persona-badge {
-    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
-    background: rgba(0,206,201,0.12); color: var(--accent);
+/* Restart button */
+.restart-btn {
+    padding: 4px 12px; border-radius: var(--radius-xs);
+    font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border-light);
+    background: transparent; color: var(--text-muted);
+    cursor: pointer; transition: var(--transition);
 }
+.restart-btn:hover { border-color: var(--brand-light); color: var(--text-primary); }
 
 /* ── Viewer stage ────────────────────────────────────────────── */
 .viewer-stage {
@@ -102,31 +68,122 @@ html, body { height: 100%; overflow: hidden; background: #08080f; }
     background: #06060e;
 }
 
-/* Tooltip banner */
+/* Tooltip banner — position:absolute inside screenshot-container (same coord space as hotspots) */
+/* JS always sets left/top before making it visible — no CSS default position needed */
 .step-tooltip-banner {
-    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    position: absolute;
     z-index: 20;
-    background: rgba(26,25,40,0.95); backdrop-filter: blur(8px);
-    border: 1px solid var(--border);
+    background: rgba(20,22,30,0.98); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.12);
     border-radius: var(--radius);
-    padding: 10px 20px;
+    padding: 12px 40px 12px 16px;
     font-size: 14px; color: var(--text-primary);
-    max-width: 580px; text-align: center; line-height: 1.5;
-    box-shadow: var(--shadow);
-    opacity: 0; transform: translateX(-50%) translateY(-6px);
-    transition: all 0.22s ease;
+    min-width: 200px; max-width: 420px;
+    text-align: left; line-height: 1.5;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.22s ease;
+    display: flex; flex-direction: column; gap: 10px;
 }
-.step-tooltip-banner.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.step-tooltip-banner.visible { opacity: 1; pointer-events: all; }
+.step-tooltip-banner.dismissed { opacity: 0 !important; pointer-events: none !important; }
 
-/* Screenshot container */
+/* Banner text — supports HTML from rich-text editor */
+.step-tooltip-banner #tooltip-text {
+    font-size: 14px; line-height: 1.55;
+    white-space: normal; word-break: break-word;
+}
+.step-tooltip-banner #tooltip-text b,
+.step-tooltip-banner #tooltip-text strong { font-weight: 700; }
+.step-tooltip-banner #tooltip-text em,
+.step-tooltip-banner #tooltip-text i     { font-style: italic; }
+.step-tooltip-banner #tooltip-text ul    { margin: 4px 0 4px 16px; padding: 0; list-style: disc; }
+.step-tooltip-banner #tooltip-text li    { margin: 2px 0; }
+
+/* Pointer triangle variants.
+   --ptr-h: horizontal offset (px) from banner left to hotspot center.
+   --ptr-v: vertical offset (px) from banner top to hotspot center.
+   JS sets these so the pointer always aims at the hotspot even when the banner is clamped. */
+.step-tooltip-banner.pointer-bottom::after,
+.step-tooltip-banner.pointer-top::before,
+.step-tooltip-banner.pointer-left::before,
+.step-tooltip-banner.pointer-right::after {
+    content: ''; position: absolute;
+    border: 8px solid transparent;
+}
+.step-tooltip-banner.pointer-bottom::after {
+    top: 100%;
+    left: calc(var(--ptr-h, 50%) - 8px);
+    transform: none;
+    border-top-color: rgba(26,25,40,0.97);
+}
+.step-tooltip-banner.pointer-top::before {
+    bottom: 100%;
+    left: calc(var(--ptr-h, 50%) - 8px);
+    transform: none;
+    border-bottom-color: rgba(26,25,40,0.97);
+}
+.step-tooltip-banner.pointer-left::before {
+    right: 100%;
+    top: calc(var(--ptr-v, 50%) - 8px);
+    transform: none;
+    border-right-color: rgba(26,25,40,0.97);
+}
+.step-tooltip-banner.pointer-right::after {
+    left: 100%;
+    top: calc(var(--ptr-v, 50%) - 8px);
+    transform: none;
+    border-left-color: rgba(26,25,40,0.97);
+}
+
+/* Tooltip close button */
+.tooltip-close-btn {
+    position: absolute; top: 6px; right: 8px;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 16px; line-height: 1;
+    padding: 2px 4px; border-radius: 3px;
+    transition: color var(--transition);
+}
+.tooltip-close-btn:hover { color: var(--text-primary); }
+
+/* Tooltip CTA button — hot pink */
+.tooltip-cta-btn {
+    display: block;
+    width: 100%;
+    padding: 7px 14px; border-radius: var(--radius-sm);
+    background: #e91e8c; color: #fff;
+    border: none; cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: background 0.18s ease; text-align: center;
+    margin-top: 2px;
+}
+.tooltip-cta-btn:hover { background: #c4156f; }
+/* hidden class wins — must be last */
+.tooltip-cta-btn.hidden { display: none !important; }
+
+/* Clickable progress pills */
+.progress-pill { cursor: pointer; }
+.progress-pill:hover { opacity: 0.8; }
+
+/* Stage crossfade — fade the screenshot img, not the whole stage (avoids black flash) */
+.viewer-stage { transition: none; }
+#demo-img {
+    transition: opacity 0.22s ease;
+}
+#demo-img.fading-out { opacity: 0; }
+#demo-img.fading-in  { opacity: 1; }
+
+/* Screenshot container — inline-block shrink-wraps to image size.
+   width:fit-content prevents it from stretching as a flex item inside viewer-stage. */
 .screenshot-container {
-    position: relative; display: inline-block;
-    max-width: 100%; max-height: 100%;
+    position: relative;
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    line-height: 0; /* Remove inline-block gap below image */
 }
 .screenshot-container img {
     display: block;
     max-width: 100%; max-height: calc(100vh - 112px);
-    object-fit: contain;
     border-radius: 4px;
     user-select: none;
 }
@@ -139,8 +196,8 @@ html, body { height: 100%; overflow: hidden; background: #08080f; }
 }
 .hs-region {
     position: absolute;
-    border: 2px solid rgba(162,155,254,0.7);
-    background: rgba(108,92,231,0.12);
+    border: 2px solid rgba(139,126,239,0.5);
+    background: rgba(90,63,216,0.10);
     border-radius: 4px;
     pointer-events: all;
     cursor: pointer;
@@ -148,14 +205,72 @@ html, body { height: 100%; overflow: hidden; background: #08080f; }
     animation: pulse-hs 2.4s ease-in-out infinite;
 }
 .hs-region:hover {
-    background: rgba(108,92,231,0.28);
-    border-color: var(--brand-light);
+    background: rgba(90,63,216,0.22);
+    border-color: rgba(139,126,239,0.8);
     animation: none;
 }
 @keyframes pulse-hs {
-    0%, 100% { background: rgba(108,92,231,0.08); }
-    50%       { background: rgba(108,92,231,0.22); }
+    0%, 100% { background: rgba(90,63,216,0.06); }
+    50%       { background: rgba(90,63,216,0.16); }
 }
+
+/* ── Beacon dot — hot pink, solid ────────────────────────────── */
+.hs-beacon {
+    position: absolute;
+    top: -6px; right: -6px;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--brand-pink);
+    border: 2px solid rgba(255,255,255,0.6);
+    box-shadow: 0 0 0 0 rgba(233,30,140,0.9);
+    animation: beacon-pulse 1.8s ease-out infinite;
+    z-index: 5;
+    pointer-events: none;
+}
+@keyframes beacon-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(233,30,140,0.9); }
+    60%  { box-shadow: 0 0 0 9px rgba(233,30,140,0.3); }
+    100% { box-shadow: 0 0 0 12px rgba(233,30,140,0); }
+}
+
+/* ── Hotspot popover ─────────────────────────────────────────── */
+.hs-popover {
+    position: absolute;
+    bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+    background: rgba(26,25,40,0.98); backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    min-width: 160px; max-width: 260px;
+    box-shadow: var(--shadow);
+    pointer-events: all;
+    z-index: 25;
+    opacity: 0; transform: translateX(-50%) translateY(4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+/* Pointer triangle on popover */
+.hs-popover::after {
+    content: ''; position: absolute;
+    top: 100%; left: 50%; transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: rgba(26,25,40,0.98);
+}
+.hs-region:hover .hs-popover {
+    opacity: 1; transform: translateX(-50%) translateY(0);
+}
+.hs-popover-text {
+    font-size: 13px; color: var(--text-primary);
+    line-height: 1.5; margin: 0 0 8px; text-align: center;
+}
+.hs-popover-text:last-child { margin-bottom: 0; }
+.hs-popover-cta {
+    width: 100%;
+    padding: 6px 12px; border-radius: var(--radius-sm);
+    background: var(--brand-pink); color: #fff;
+    border: none; cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: background var(--transition);
+}
+.hs-popover-cta:hover { background: #c4156f; }
 
 /* Hotspot tooltip popover */
 .hs-tooltip {
@@ -214,13 +329,16 @@ html, body { height: 100%; overflow: hidden; background: #08080f; }
     position: fixed; inset: 0; z-index: 300;
     background: var(--bg-dark);
     flex-direction: column; align-items: center; justify-content: center;
-    gap: 20px; text-align: center; padding: 40px;
+    gap: 16px; text-align: center; padding: 40px;
 }
 .completion-screen.visible { display: flex; }
-.completion-icon { font-size: 56px; }
+.completion-logo img { height: 32px; width: auto; margin-bottom: 8px; }
 .completion-screen h2 { font-size: 28px; font-weight: 800; }
 .completion-screen p  { font-size: 15px; color: var(--text-secondary); max-width: 420px; line-height: 1.6; }
 .completion-actions { display: flex; gap: 12px; margin-top: 8px; }
+.completion-secondary { margin-top: 4px; font-size: 13px; }
+.completion-secondary a { color: var(--text-muted); text-decoration: underline; }
+.completion-secondary a:hover { color: var(--brand-light); }
 
 /* ── No-step placeholder ─────────────────────────────────────── */
 .no-steps-screen {

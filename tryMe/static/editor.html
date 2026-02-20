@@ -36,13 +36,22 @@
         </div>
         <div class="step-sidebar-footer">
             <button class="btn btn-primary" style="width:100%;" onclick="editor.addStep()">+ Add Step</button>
+            <label class="btn btn-secondary bulk-upload-btn" for="bulk-upload" title="Select multiple screenshots to create steps in one go" style="width:100%;margin-top:8px;justify-content:center;cursor:pointer;">
+                📂 Bulk Import Screenshots
+            </label>
+            <input type="file" id="bulk-upload" accept="image/*" multiple style="display:none"
+                   onchange="editor.handleBulkUpload(this)">
         </div>
     </div>
 
     <!-- CENTER: Canvas editor -->
     <div class="canvas-area">
         <div class="canvas-toolbar">
-            <label class="upload-label" for="screenshot-upload">
+            <!-- Step title lives here — always visible, top of the editing area -->
+            <input type="text" class="toolbar-step-title" id="step-title-input"
+                   placeholder="Step title…" title="Step title">
+            <div class="separator"></div>
+            <label class="upload-label disabled" id="toolbar-upload-label" for="screenshot-upload" title="Select a step first">
                 📷 Replace Screenshot
             </label>
             <input type="file" id="screenshot-upload" accept="image/*" style="display:none"
@@ -61,27 +70,86 @@
         <div class="canvas-viewport" id="canvas-viewport">
             <div class="no-screenshot" id="no-screenshot">
                 <div class="icon">📸</div>
-                <p>No screenshot yet — upload one to get started</p>
-                <label class="btn btn-primary" for="screenshot-upload">Upload Screenshot</label>
+                <p id="no-screenshot-msg">Add a step first, then upload a screenshot</p>
+                <label class="btn btn-primary" id="no-screenshot-upload-btn" for="screenshot-upload" style="display:none">Upload Screenshot</label>
             </div>
+            <!-- Banner preview lives inside canvas-container so its left/top share
+                 the same coordinate space as hotspot canvas fractions -->
             <div class="canvas-container" id="canvas-container" style="display:none;">
                 <img id="canvas-img" src="" alt="Step screenshot" draggable="false">
                 <canvas id="hotspot-canvas"></canvas>
+                <div class="editor-banner-preview" id="editor-banner-preview" style="display:none;">
+                    <div class="editor-banner-body">
+                        <span id="editor-banner-text"></span>
+                        <button class="editor-banner-cta" id="editor-banner-cta" tabindex="-1"></button>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Step meta bar -->
         <div class="step-meta-bar">
-            <div class="field-group" style="flex:1">
-                <label>Step Title</label>
-                <input type="text" id="step-title-input" placeholder="e.g. Click the Dashboard button"
-                       onblur="editor.saveStepMeta()">
+
+            <!-- Col 1: Banner copy with rich-text toolbar -->
+            <div class="field-group banner-copy-group">
+                <label>Banner copy</label>
+                <!-- Formatting toolbar -->
+                <div class="rte-toolbar" id="rte-toolbar">
+                    <button type="button" class="rte-btn" data-cmd="bold"        title="Bold">B</button>
+                    <button type="button" class="rte-btn" data-cmd="italic"      title="Italic"><em>I</em></button>
+                    <button type="button" class="rte-btn" data-cmd="insertUnorderedList" title="Bullets">☰</button>
+                    <div class="rte-sep"></div>
+                    <button type="button" class="rte-btn" data-cmd="justifyLeft"   title="Left">⇤</button>
+                    <button type="button" class="rte-btn" data-cmd="justifyCenter" title="Center">≡</button>
+                    <button type="button" class="rte-btn" data-cmd="justifyRight"  title="Right">⇥</button>
+                    <div class="rte-sep"></div>
+                    <!-- Brand colour swatches -->
+                    <button type="button" class="rte-color" style="background:#ffffff;" data-color="#ffffff" title="White"></button>
+                    <button type="button" class="rte-color" style="background:#e91e8c;" data-color="#e91e8c" title="Pink"></button>
+                    <button type="button" class="rte-color" style="background:#0dcaff;" data-color="#0dcaff" title="Cyan"></button>
+                    <button type="button" class="rte-color" style="background:#8b7eef;" data-color="#8b7eef" title="Purple"></button>
+                    <button type="button" class="rte-color" style="background:#b0b8d0;" data-color="#b0b8d0" title="Muted"></button>
+                </div>
+                <div id="step-tooltip-input"
+                     class="rte-editor"
+                     contenteditable="true"
+                     data-placeholder="What should the viewer do here?"
+                     oninput="editor._updateEditorBanner()"></div>
+                <!-- Hidden sync field for plain-text fallback -->
+                <textarea id="step-tooltip-plain" style="display:none;"></textarea>
             </div>
-            <div class="field-group" style="flex:2">
-                <label>Tooltip / Instruction shown to viewer</label>
-                <textarea id="step-tooltip-input" placeholder="What should the viewer do here? e.g. 'Click on Dashboard to see your analytics overview.'"
-                          onblur="editor.saveStepMeta()"></textarea>
+
+            <!-- Col 2: CTA + anchor -->
+            <div class="field-group">
+                <label>Banner CTA label</label>
+                <input type="text" id="banner-cta-label" placeholder="e.g. Next →" oninput="editor._updateEditorBanner()">
+                <select id="banner-cta-action" onchange="editor._toggleBannerCtaTarget(this.value); editor._updateEditorBanner();" style="margin-top:4px;">
+                    <option value="next">→ Next step</option>
+                    <option value="goto">⤵ Specific step</option>
+                </select>
+                <div class="field-group" id="banner-cta-target-group" style="display:none;margin-top:4px;">
+                    <select id="banner-cta-target"></select>
+                </div>
+                <label style="margin-top:8px;">Anchor to hotspot</label>
+                <select id="banner-hotspot-anchor" onchange="editor._updateEditorBanner()" style="margin-top:2px;">
+                    <option value="">— Float (top-center) —</option>
+                </select>
             </div>
+
+            <!-- Col 3: Pointer + save -->
+            <div class="field-group">
+                <label>Pointer side</label>
+                <select id="banner-pointer" onchange="editor._updateEditorBanner()">
+                    <option value="none">None</option>
+                    <option value="bottom">↓ Bottom</option>
+                    <option value="top">↑ Top</option>
+                    <option value="left">← Left</option>
+                    <option value="right">→ Right</option>
+                </select>
+            </div>
+            <button class="btn btn-primary save-step-btn" onclick="editor.saveStepMeta()">💾 Save Step</button>
+
+            <input type="hidden" id="step-notes-input" value="">
         </div>
     </div>
 

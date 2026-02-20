@@ -78,8 +78,8 @@ html, body { height: 100%; overflow: hidden; }
 }
 .step-item:hover { background: var(--bg-card); }
 .step-item.active {
-    background: rgba(108,92,231,0.15);
-    border-color: rgba(108,92,231,0.35);
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.16);
 }
 .step-number {
     width: 22px; height: 22px; border-radius: 50%;
@@ -89,7 +89,7 @@ html, body { height: 100%; overflow: hidden; }
     flex-shrink: 0;
 }
 .step-item.active .step-number {
-    background: var(--brand-primary); color: #fff; border-color: var(--brand-primary);
+    background: var(--brand-pink); color: #fff; border-color: var(--brand-pink);
 }
 .step-thumb {
     width: 44px; height: 30px; border-radius: 4px;
@@ -114,7 +114,7 @@ html, body { height: 100%; overflow: hidden; }
     border-radius: 4px; flex-shrink: 0;
 }
 .step-item:hover .step-delete { display: flex; }
-.step-delete:hover { color: #e17055; background: rgba(225,112,85,0.1); }
+.step-delete:hover { color: var(--brand-pink); background: rgba(233,30,140,0.1); }
 
 /* drag handle */
 .step-drag-handle {
@@ -140,10 +140,29 @@ html, body { height: 100%; overflow: hidden; }
 }
 .canvas-toolbar {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 16px;
+    padding: 6px 16px;
     background: var(--bg-panel);
     border-bottom: 1px solid var(--border-light);
     flex-shrink: 0;
+}
+/* Step title lives in the toolbar, left-most, bold */
+.toolbar-step-title {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-xs);
+    color: var(--text-primary);
+    font-size: 13px; font-weight: 700;
+    padding: 4px 8px;
+    width: 180px;
+    min-width: 100px;
+    flex-shrink: 1;
+    transition: border-color var(--transition), background var(--transition);
+}
+.toolbar-step-title::placeholder { color: var(--text-muted); font-weight: 400; }
+.toolbar-step-title:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--bg-input);
 }
 .canvas-toolbar .tool-btn {
     padding: 5px 12px; border-radius: var(--radius-xs);
@@ -154,7 +173,7 @@ html, body { height: 100%; overflow: hidden; }
 }
 .canvas-toolbar .tool-btn:hover { border-color: var(--brand-light); color: var(--text-primary); }
 .canvas-toolbar .tool-btn.active {
-    background: rgba(108,92,231,0.2); border-color: var(--brand-primary); color: var(--brand-light);
+    background: rgba(13,202,255,0.12); border-color: var(--accent); color: var(--accent);
 }
 .canvas-toolbar .upload-label {
     display: inline-flex; align-items: center; gap: 5px;
@@ -165,21 +184,28 @@ html, body { height: 100%; overflow: hidden; }
     cursor: pointer; transition: var(--transition);
 }
 .canvas-toolbar .upload-label:hover { border-color: var(--brand-light); color: var(--text-primary); }
+.canvas-toolbar .upload-label.disabled {
+    opacity: 0.4; cursor: not-allowed; pointer-events: none;
+}
 .canvas-toolbar .separator { width: 1px; height: 22px; background: var(--border-light); }
 .hint-text { font-size: 12px; color: var(--text-muted); }
 
 .canvas-viewport {
-    flex: 1; overflow: auto;
+    flex: 1; overflow: hidden;
+    position: relative;
     display: flex; align-items: center; justify-content: center;
     padding: 24px;
 }
 .canvas-container {
-    position: relative; display: inline-block;
-    max-width: 100%; max-height: 100%;
+    position: relative;
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
+    line-height: 0; /* Remove inline-block gap below image */
 }
 .canvas-container img {
     display: block; max-width: 100%; max-height: calc(100vh - 200px);
-    object-fit: contain; border-radius: var(--radius-xs);
+    border-radius: var(--radius-xs);
     user-select: none; pointer-events: none;
 }
 .canvas-container canvas {
@@ -198,19 +224,161 @@ html, body { height: 100%; overflow: hidden; }
 .no-screenshot .icon { font-size: 48px; }
 .no-screenshot p { font-size: 13px; max-width: 280px; }
 
-/* Step metadata below canvas */
+/* ── Banner preview — absolute overlay inside canvas-container ── */
+/* canvas-container wraps the image exactly, so left/top match hotspot % fractions. */
+/* JS always sets left/top before showing — no CSS default position needed. */
+.editor-banner-preview {
+    position: absolute;
+    z-index: 60;
+    background: rgba(16, 17, 28, 0.97);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 12px;
+    padding: 10px 14px 10px 14px;
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 13px; color: #eef0f8; line-height: 1.5;
+    max-width: 360px; min-width: 180px;
+    cursor: grab;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+    user-select: none;
+    pointer-events: all;
+}
+.editor-banner-body {
+    display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0;
+}
+/* CTA button inside the editor banner */
+.editor-banner-cta {
+    display: block;
+    width: 100%;
+    padding: 6px 12px; border-radius: 6px;
+    background: #e91e8c; color: #fff;
+    border: none; cursor: pointer; font-size: 12px; font-weight: 600;
+    text-align: center; transition: background 0.15s;
+}
+.editor-banner-cta:hover:not(.cta-empty) { background: #c4156f; }
+.editor-banner-cta.cta-empty {
+    background: rgba(255,255,255,0.05) !important;
+    color: rgba(255,255,255,0.28) !important;
+    cursor: default !important;
+    border: 1px dashed rgba(255,255,255,0.16) !important;
+}
+/* Banner text preserves line breaks typed in textarea */
+#editor-banner-text { white-space: pre-wrap; word-break: break-word; }
+/* placeholder text when banner copy is empty */
+#editor-banner-text:empty::before {
+    content: 'Banner copy goes here…';
+    color: rgba(255,255,255,0.22);
+    font-style: italic;
+}
+
+/* Pointer arrows on the editor banner card preview.
+   --ptr-h / --ptr-v are set by JS so the arrow aims at the hotspot center. */
+.editor-banner-preview[data-pointer="bottom"]::after,
+.editor-banner-preview[data-pointer="top"]::before,
+.editor-banner-preview[data-pointer="left"]::before,
+.editor-banner-preview[data-pointer="right"]::after {
+    content: ''; position: absolute;
+    border: 8px solid transparent;
+    pointer-events: none;
+}
+.editor-banner-preview[data-pointer="bottom"]::after {
+    top: 100%;
+    left: calc(var(--ptr-h, 50%) - 8px);
+    transform: none;
+    border-top-color: rgba(16,17,28,0.97);
+}
+.editor-banner-preview[data-pointer="top"]::before {
+    bottom: 100%;
+    left: calc(var(--ptr-h, 50%) - 8px);
+    transform: none;
+    border-bottom-color: rgba(16,17,28,0.97);
+}
+.editor-banner-preview[data-pointer="left"]::before {
+    right: 100%;
+    top: calc(var(--ptr-v, 50%) - 8px);
+    transform: none;
+    border-right-color: rgba(16,17,28,0.97);
+}
+.editor-banner-preview[data-pointer="right"]::after {
+    left: 100%;
+    top: calc(var(--ptr-v, 50%) - 8px);
+    transform: none;
+    border-left-color: rgba(16,17,28,0.97);
+}
+
+/* Step metadata below canvas — banner fields only (title is in toolbar) */
 .step-meta-bar {
-    padding: 10px 16px;
+    padding: 8px 16px 8px;
     background: var(--bg-panel);
     border-top: 1px solid var(--border-light);
-    display: flex; gap: 12px; align-items: flex-start;
+    display: grid;
+    grid-template-columns: 2fr 1.4fr 0.8fr auto;
+    grid-template-rows: auto;
+    gap: 8px 10px;
+    align-items: start;   /* top-align all cells */
     flex-shrink: 0;
 }
-.step-meta-bar .field-group { margin-bottom: 0; flex: 1; }
-.step-meta-bar input, .step-meta-bar textarea {
-    font-size: 12px; padding: 6px 10px;
+.step-meta-bar .field-group { margin-bottom: 0; min-width: 0; }
+.step-meta-bar input, .step-meta-bar select, .step-meta-bar textarea {
+    font-size: 12px; padding: 5px 9px;
 }
-.step-meta-bar textarea { min-height: 48px; resize: none; }
+/* Save button top-aligned in last column */
+.step-meta-bar .save-step-btn {
+    align-self: start; margin-top: 18px; white-space: nowrap;
+}
+
+/* ── Rich Text Editor (banner copy field) ────────────────────── */
+.banner-copy-group { display: flex; flex-direction: column; gap: 0; }
+
+.rte-toolbar {
+    display: flex; align-items: center; gap: 2px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+    padding: 3px 5px;
+    flex-wrap: wrap;
+}
+.rte-btn {
+    background: none; border: none; color: var(--text-secondary);
+    font-size: 12px; font-weight: 700;
+    padding: 2px 6px; border-radius: 3px;
+    cursor: pointer; line-height: 1.4;
+    transition: background 0.12s, color 0.12s;
+}
+.rte-btn:hover    { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.rte-btn.active   { background: rgba(13,202,255,0.18); color: var(--accent); }
+.rte-sep { width: 1px; height: 14px; background: var(--border-light); margin: 0 3px; }
+.rte-color {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid transparent; cursor: pointer;
+    outline: none; padding: 0; flex-shrink: 0;
+    transition: border-color 0.12s, transform 0.1s;
+}
+.rte-color:hover  { border-color: rgba(255,255,255,0.5); transform: scale(1.2); }
+.rte-color.active { border-color: #fff; }
+
+.rte-editor {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+    color: var(--text-primary);
+    font-size: 12px; line-height: 1.5;
+    min-height: 56px; max-height: 120px;
+    overflow-y: auto;
+    padding: 6px 9px;
+    outline: none;
+    white-space: pre-wrap; word-break: break-word;
+}
+.rte-editor:focus { border-color: var(--accent); }
+.rte-editor:empty:before {
+    content: attr(data-placeholder);
+    color: var(--text-muted); pointer-events: none;
+}
+/* Styling for RTE content */
+.rte-editor b, .rte-editor strong { font-weight: 700; }
+.rte-editor em, .rte-editor i     { font-style: italic; }
+.rte-editor ul { margin: 2px 0 2px 16px; padding: 0; list-style: disc; }
+.rte-editor li { margin: 1px 0; }
 
 /* ── Hotspot panel ───────────────────────────────────────────── */
 .hotspot-panel {
@@ -248,8 +416,8 @@ html, body { height: 100%; overflow: hidden; }
     transition: var(--transition);
 }
 .hotspot-item:hover, .hotspot-item.active {
-    border-color: rgba(108,92,231,0.4);
-    background: rgba(108,92,231,0.08);
+    border-color: rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.04);
 }
 .hotspot-item-top {
     display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
@@ -262,32 +430,47 @@ html, body { height: 100%; overflow: hidden; }
     font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
     flex-shrink: 0;
 }
-.action-next  { background: rgba(0,206,201,0.15); color: var(--accent); }
-.action-goto  { background: rgba(108,92,231,0.2);  color: var(--brand-light); }
-.action-end   { background: rgba(253,121,168,0.15); color: var(--accent-warm); }
+.action-none  { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+.action-next  { background: rgba(13,202,255,0.15); color: var(--accent); }
+.action-goto  { background: rgba(13,202,255,0.12); color: var(--accent); }
+.action-end   { background: rgba(233,30,140,0.15); color: var(--brand-pink); }
 .hotspot-coords { font-size: 10px; color: var(--text-muted); margin-top: 3px; font-family: var(--font-mono); }
 
 /* Hotspot edit form */
 .hotspot-edit-form {
     background: var(--bg-card);
-    border: 1px solid rgba(108,92,231,0.3);
+    border: 1px solid rgba(13,202,255,0.25);
     border-radius: var(--radius-sm);
     padding: 14px;
     margin-bottom: 8px;
 }
 .hotspot-edit-form .form-title {
-    font-size: 12px; font-weight: 700; color: var(--brand-light);
-    margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 700; color: var(--accent);
+    margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;
 }
-.hotspot-edit-form .field-group { margin-bottom: 10px; }
+.hotspot-edit-form .field-group { margin-bottom: 12px; }
 .hotspot-edit-form input,
 .hotspot-edit-form select { font-size: 12px; padding: 6px 10px; }
-.hotspot-edit-form label { font-size: 11px; margin-bottom: 4px; }
+/* Override ALL-CAPS for hotspot panel labels — keep readable */
+.hotspot-edit-form label,
+.hotspot-panel .field-group label {
+    font-size: 11px; margin-bottom: 4px;
+    text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--text-secondary);
+}
+.hotspot-edit-form .checkbox-label {
+    display: flex; align-items: center; gap: 7px;
+    text-transform: none; letter-spacing: 0;
+    font-size: 12px; font-weight: 500; color: var(--text-primary);
+    cursor: pointer;
+}
+.hotspot-edit-form .checkbox-label input[type="checkbox"] {
+    width: auto; margin: 0; cursor: pointer; accent-color: var(--brand-pink);
+}
 
 /* Hotspot draw instruction */
 .draw-instruction {
-    padding: 12px; margin: 0 12px 12px;
-    background: rgba(108,92,231,0.1); border: 1px solid rgba(108,92,231,0.2);
-    border-radius: var(--radius-sm); font-size: 12px; color: var(--brand-light);
+    padding: 10px 12px; margin: 0 0 12px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm); font-size: 12px; color: var(--grey-light);
     line-height: 1.5; text-align: center;
 }
