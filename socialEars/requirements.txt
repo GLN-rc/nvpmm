@@ -1,0 +1,20 @@
+# socialEars — Social Listening Agent
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Reddit
+praw>=7.7.0
+
+# HTTP (Hacker News / Algolia)
+aiohttp>=3.9.0
+
+# LLM
+litellm>=1.0.0
+openai>=1.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0

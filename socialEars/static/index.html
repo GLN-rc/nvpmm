@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>socialEars — GTM Social Listening</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<div class="app">
+
+    <!-- ── Sidebar ───────────────────────────────────────────────────────── -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>socialEars</h1>
+            <p>GTM social listening for Replica Cyber</p>
+        </div>
+        <div class="sidebar-body">
+
+            <!-- Keywords -->
+            <div class="form-section">
+                <div class="form-label">Keywords</div>
+                <div class="chip-input-wrap" id="chip-wrap">
+                    <input class="chip-input" id="keyword-input" placeholder="Type keyword + Enter" autocomplete="off">
+                </div>
+                <div class="chip-hint">e.g. "ransomware", "endpoint detection", "OSINT"</div>
+            </div>
+
+            <!-- Sources -->
+            <div class="form-section">
+                <div class="form-label">Sources</div>
+                <div class="source-toggles">
+                    <div class="source-toggle active" data-source="reddit"     id="toggle-reddit">Reddit</div>
+                    <div class="source-toggle active" data-source="hackernews" id="toggle-hn">Hacker News</div>
+                </div>
+            </div>
+
+            <!-- Time range -->
+            <div class="form-section">
+                <div class="form-label">Time Range</div>
+                <select class="time-select" id="time-filter">
+                    <option value="week">Past week</option>
+                    <option value="month" selected>Past month</option>
+                    <option value="year">Past year</option>
+                    <option value="all">All time</option>
+                </select>
+            </div>
+
+            <!-- Subreddits (shown only when Reddit is active) -->
+            <div class="form-section" id="subreddit-section">
+                <div class="form-label">Subreddits</div>
+                <div class="sub-select-all" id="sub-toggle-all">Select all / None</div>
+                <div class="subreddit-list" id="subreddit-list">
+                    <!-- populated by JS -->
+                </div>
+            </div>
+
+            <!-- Run -->
+            <div class="form-section">
+                <button class="run-btn" id="run-btn">Run Analysis</button>
+            </div>
+
+            <!-- History -->
+            <div class="form-section">
+                <div class="form-label">Recent Runs</div>
+                <div class="run-history" id="run-history">
+                    <!-- populated by JS -->
+                </div>
+            </div>
+
+        </div>
+    </aside>
+
+    <!-- ── Main ──────────────────────────────────────────────────────────── -->
+    <main class="main">
+        <div class="main-header">
+            <h2 id="main-title">Select keywords and run</h2>
+            <div class="main-header-meta" id="main-meta"></div>
+        </div>
+        <div class="main-body" id="main-body">
+            <div class="empty-state" id="empty-state">
+                <div class="icon">👂</div>
+                <p>Enter keywords like <strong>"ransomware"</strong> or <strong>"fraud investigation"</strong>, choose sources, and click <strong>Run Analysis</strong>.</p>
+            </div>
+        </div>
+    </main>
+
+</div>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
