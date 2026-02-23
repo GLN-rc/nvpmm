@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>trustFall — Vendor Trust Page Monitor</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>trustFall</h1>
+            <p>Vendor trust page monitor</p>
+        </div>
+        <div class="sidebar-body">
+
+            <div class="form-section">
+                <div class="form-label">Vendors</div>
+                <div id="vendor-list" class="vendor-list">
+                    <!-- populated by JS -->
+                </div>
+                <button class="btn-add" id="btn-add-vendor">+ Add vendor</button>
+            </div>
+
+            <div class="form-section" id="pending-section" style="display:none">
+                <div class="form-label">Pending Review</div>
+                <div id="pending-badge" class="pending-badge">0 changes</div>
+                <button class="btn-secondary" id="btn-view-pending" style="width:100%">View all pending</button>
+            </div>
+
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="main-header">
+            <h2 id="main-title">Select a vendor</h2>
+            <div class="main-header-meta" id="main-meta"></div>
+        </div>
+        <div class="main-body" id="main-body">
+            <div class="empty-state">
+                <div class="icon">🔍</div>
+                <p>Add a vendor to start monitoring their trust and AI policy pages.</p>
+            </div>
+        </div>
+    </main>
+
+</div>
+
+<!-- Add Vendor Modal -->
+<div class="modal-overlay" id="modal-add-vendor" style="display:none">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Add Vendor</h3>
+            <span class="modal-close" onclick="closeModal('modal-add-vendor')">×</span>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label>Vendor name</label>
+                <input type="text" id="input-vendor-name" placeholder="e.g. Notion" />
+            </div>
+            <div class="field">
+                <label>Website</label>
+                <input type="text" id="input-vendor-website" placeholder="e.g. notion.so" />
+            </div>
+            <div class="field">
+                <label>Starting URL <span class="optional">(optional — we'll suggest more)</span></label>
+                <input type="text" id="input-vendor-url" placeholder="e.g. https://notion.so/privacy" />
+            </div>
+            <div class="field">
+                <label>Notes <span class="optional">(optional)</span></label>
+                <input type="text" id="input-vendor-notes" placeholder="e.g. Using Notion AI for docs" />
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal('modal-add-vendor')">Cancel</button>
+            <button class="btn-primary" id="btn-save-vendor" style="width:auto;padding:9px 20px">Add Vendor</button>
+        </div>
+    </div>
+</div>
+
+<!-- Diff detail modal -->
+<div class="modal-overlay" id="modal-diff" style="display:none">
+    <div class="modal modal-wide">
+        <div class="modal-header">
+            <h3 id="modal-diff-title">Change Detail</h3>
+            <span class="modal-close" onclick="closeModal('modal-diff')">×</span>
+        </div>
+        <div class="modal-body" id="modal-diff-body">
+        </div>
+        <div class="modal-footer" id="modal-diff-footer">
+        </div>
+    </div>
+</div>
+
+<!-- Paste baseline modal -->
+<div class="modal-overlay" id="modal-baseline" style="display:none">
+    <div class="modal modal-wide">
+        <div class="modal-header">
+            <h3>Set your own baseline</h3>
+            <span class="modal-close" onclick="closeModal('modal-baseline')">×</span>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:13px;color:var(--grey-medium);margin-bottom:16px;line-height:1.6">
+                Open the vendor's policy page in your browser, select all text, copy it, and paste it below.
+                Future "Check now" runs will compare against this version.
+            </p>
+            <div class="field">
+                <label>As of date <span class="optional">(optional — when was this text from?)</span></label>
+                <input type="date" id="baseline-date" />
+            </div>
+            <div class="field">
+                <label>Paste policy text here</label>
+                <textarea id="baseline-text"
+                    style="min-height:240px;resize:vertical;font-family:var(--font-primary);font-size:12px;
+                           background:var(--grey-lightest);border:1px solid var(--grey-light);
+                           border-radius:var(--radius-sm);padding:10px;color:var(--body-text);
+                           outline:none;width:100%;line-height:1.5"
+                    placeholder="Paste the page text here..."></textarea>
+                <div id="baseline-char-count" style="font-size:11px;color:var(--grey-medium);margin-top:4px"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal('modal-baseline')">Cancel</button>
+            <button class="btn-primary" id="btn-save-baseline" style="width:auto;padding:9px 20px">Save as baseline</button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
