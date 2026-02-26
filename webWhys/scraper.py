@@ -55,6 +55,25 @@ class WebsiteScraper:
                 soup = BeautifulSoup(html, "lxml")
                 doc = Document(html)
 
+                # Detect bot-protection / CAPTCHA walls before analyzing
+                page_text = soup.get_text(" ", strip=True)
+                word_count_check = len(page_text.split())
+                block_signals = [
+                    "security checkpoint", "vercel security", "cloudflare", "ddos protection",
+                    "access denied", "captcha", "checking your browser", "ray id", "please wait",
+                    "just a moment", "enable javascript and cookies", "bot protection"
+                ]
+                is_blocked = (
+                    word_count_check < 100 and
+                    any(sig in page_text.lower() for sig in block_signals)
+                )
+
+                if is_blocked:
+                    result["status"] = "blocked"
+                    result["error"] = "Bot protection detected — the site returned a security checkpoint page. Data for this competitor is unavailable."
+                    result["http_status"] = response.status
+                    return result
+
                 # Analyze all aspects
                 result["seo_factors"] = self._analyze_seo(soup, url)
                 result["content_analysis"] = self._analyze_content(soup, doc)

@@ -611,6 +611,23 @@ class WebsiteScanner {
             return;
         }
 
+        // Show a notice for any blocked/failed competitors before the table
+        const blockedComps = competitors.filter(c => c.status === 'blocked' || c.status === 'error' || c.status === 'timeout');
+        const blockedNotice = blockedComps.length > 0 ? `
+            <div style="background: #fff7ed; border: 1px solid #f0c070; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 0.875rem; color: #8a6200;">
+                <strong>⚠️ Some competitors could not be analyzed:</strong>
+                <ul style="margin: 6px 0 0 18px;">
+                    ${blockedComps.map(c => `<li><strong>${c.domain || c.url}</strong> — ${
+                        c.status === 'blocked' ? 'Bot protection / firewall blocked access' :
+                        c.status === 'timeout' ? 'Request timed out' :
+                        (c.error || 'Could not retrieve page')
+                    }</li>`).join('')}
+                </ul>
+                <p style="margin: 6px 0 0 0; color: #666;">Try a different competitor URL, or check that the site is publicly accessible.</p>
+            </div>
+        ` : '';
+        container.innerHTML = blockedNotice;
+
         const yourSeo = yourSite?.seo_factors || {};
         const yourWords = yourSeo.word_count || 0;
 
@@ -944,7 +961,7 @@ class WebsiteScanner {
             </div>
         ` : '';
 
-        container.innerHTML = tableHtml + `
+        container.innerHTML += tableHtml + `
             <h4 style="margin: 28px 0 4px; color: var(--olive-green-dark);">Messaging Breakdown</h4>
             <p style="font-size: 0.85rem; color: #888; margin-bottom: 0;">What each site is trying to say, who they're talking to, and the value prop a visitor would walk away with.</p>
             ${blurbsHtml}

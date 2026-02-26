@@ -21,8 +21,8 @@ if __name__ == "__main__":
     load_dotenv()
 
     print("\n" + "="*60)
-    print("  Website Competitor Scanner")
-    print("  SEO | GEO | LLM Optimization Analysis")
+    print("  webWhys — Website & Competitor Analysis")
+    print("  SEO | GEO | LLM Discoverability")
     print("="*60)
     print("\n  Starting server at: http://localhost:8000")
     print("  Press Ctrl+C to stop\n")
