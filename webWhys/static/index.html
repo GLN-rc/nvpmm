@@ -7,14 +7,14 @@
     <meta name="description" content="Scan your website and competitors to get AI-powered SEO, GEO, and LLM discoverability optimization suggestions.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
     <header>
         <div class="container">
             <h1>webWhys</h1>
-            <p>Analyze your website against competitors — AI-powered recommendations for SEO, GEO, and LLM discoverability</p>
+            <p>Analyze your website → up your gaime.</p>
         </div>
     </header>
 
@@ -22,109 +22,88 @@
         <div class="container">
             <!-- Input Form Section -->
             <section id="input-section">
-                <form id="scan-form">
-                    <!-- Your Website -->
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                                </svg>
+                <div class="asymmetric-grid-35-65">
+                    <!-- Left Column (35%): Image + Brand Documents -->
+                    <div class="form-column">
+                        <img src="/static/images/accent-laptop-1.png" alt="Laptop nested in nature" class="image-accent">
+
+                        <!-- Brand Documents -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>Brand & Positioning Documents</h2>
                             </div>
-                            <h2>Your Website</h2>
-                        </div>
-                        <div class="form-group">
-                            <label for="your-website">Website URL</label>
-                            <input type="url" id="your-website" name="your_website"
-                                   placeholder="https://yourcompany.com" required>
-                            <p class="hint">Enter the main URL of your website to analyze</p>
+                            <p style="margin-bottom: var(--spacing-md); color: var(--grey-medium);">
+                                Upload documents that describe your brand, values, positioning, product documentation, or target personas. These help generate more tailored recommendations.
+                            </p>
+                            <div class="file-upload-area" id="file-drop-area">
+                                <div class="upload-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="17 8 12 3 7 8"/>
+                                        <line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                </div>
+                                <p>Drag & drop files here or <span class="browse-link">browse</span></p>
+                                <p class="hint">Supports PDF, DOCX, TXT, MD (files are processed but not stored)</p>
+                                <input type="file" id="file-input" multiple accept=".pdf,.docx,.doc,.txt,.md,.rtf" hidden>
+                            </div>
+                            <div class="file-list" id="file-list"></div>
                         </div>
                     </div>
 
-                    <!-- Competitor Websites -->
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                                    <circle cx="9" cy="7" r="4"/>
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-                                </svg>
+                    <!-- Right Column (65%): Form Fields -->
+                    <form id="scan-form" class="form-column">
+                        <!-- Your Website -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>Your Website</h2>
                             </div>
-                            <h2>Competitor Websites</h2>
+                            <div class="form-group">
+                                <input type="url" id="your-website" name="your_website"
+                                       placeholder="https://yourcompany.com" required>
+                                <p class="hint">Enter the main URL of your website to analyze</p>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="competitor-urls">Competitor URLs</label>
-                            <textarea id="competitor-urls" name="competitor_urls" rows="4"
-                                      placeholder="https://competitor1.com&#10;https://competitor2.com&#10;https://competitor3.com"></textarea>
-                            <p class="hint">Enter up to 5 competitor URLs, one per line or comma-separated</p>
-                        </div>
-                    </div>
 
-                    <!-- Brand Documents -->
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                    <polyline points="14 2 14 8 20 8"/>
-                                    <line x1="16" y1="13" x2="8" y2="13"/>
-                                    <line x1="16" y1="17" x2="8" y2="17"/>
-                                    <polyline points="10 9 9 9 8 9"/>
-                                </svg>
+                        <!-- Competitor & Focus Areas Row -->
+                        <div class="cards-row">
+                            <!-- Competitor Websites -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h2>Competitor Websites</h2>
+                                </div>
+                                <div class="form-group">
+                                    <textarea id="competitor-urls" name="competitor_urls" rows="3"
+                                              placeholder="https://competitor1.com&#10;https://competitor2.com&#10;https://competitor3.com"></textarea>
+                                    <p class="hint">Enter up to 5 competitor URLs, one per line or comma-separated</p>
+                                </div>
                             </div>
-                            <h2>Brand & Positioning Documents</h2>
-                        </div>
-                        <p style="margin-bottom: var(--spacing-md); color: var(--grey-medium);">
-                            Upload documents that describe your brand, values, positioning, product documentation, or target personas. These help generate more tailored recommendations.
-                        </p>
-                        <div class="file-upload-area" id="file-drop-area">
-                            <div class="upload-icon">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                    <polyline points="17 8 12 3 7 8"/>
-                                    <line x1="12" y1="3" x2="12" y2="15"/>
-                                </svg>
-                            </div>
-                            <p>Drag & drop files here or <span class="browse-link">browse</span></p>
-                            <p class="hint">Supports PDF, DOCX, TXT, MD (files are processed but not stored)</p>
-                            <input type="file" id="file-input" multiple accept=".pdf,.docx,.doc,.txt,.md,.rtf" hidden>
-                        </div>
-                        <div class="file-list" id="file-list"></div>
-                    </div>
 
-                    <!-- Focus Areas -->
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="icon">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <circle cx="12" cy="12" r="6"/>
-                                    <circle cx="12" cy="12" r="2"/>
-                                </svg>
+                            <!-- Focus Areas -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h2>Focus Areas (Optional)</h2>
+                                </div>
+                                <div class="form-group">
+                                    <input type="text" id="focus-areas" name="focus_areas"
+                                           placeholder="e.g., LLM discoverability, content quality, technical SEO">
+                                    <p class="hint">Comma-separated list of areas you want to focus on</p>
+                                </div>
                             </div>
-                            <h2>Focus Areas (Optional)</h2>
                         </div>
-                        <div class="form-group">
-                            <label for="focus-areas">What would you like to prioritize?</label>
-                            <input type="text" id="focus-areas" name="focus_areas"
-                                   placeholder="e.g., LLM discoverability, content quality, technical SEO">
-                            <p class="hint">Comma-separated list of areas you want to focus on</p>
-                        </div>
-                    </div>
 
-                    <!-- Submit Button -->
-                    <div class="text-center mt-lg">
-                        <button type="submit" class="btn btn-primary btn-lg" id="scan-button">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="11" cy="11" r="8"/>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                            </svg>
-                            Analyze Websites
-                        </button>
-                    </div>
-                </form>
+                        <!-- Submit Button -->
+                        <div class="text-center mt-lg">
+                            <button type="submit" class="btn btn-primary btn-lg" id="scan-button">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                                Analyze Websites
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </section>
 
             <!-- Loading Section -->
@@ -165,12 +144,11 @@
             <section id="results-section">
                 <div class="card">
                     <!-- Analysis Summary Banner -->
-                    <div id="analysis-summary" style="background: linear-gradient(135deg, var(--olive-green) 0%, var(--olive-green-dark) 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <div id="analysis-summary" style="background: #4A3453; color: white; padding: 20px; border-radius: 0; margin-bottom: 20px; border: 1px solid #3a2742;">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                             <div>
-                                <h2 style="margin: 0 0 5px 0; font-size: 1.3rem;">Analysis Results</h2>
+                                <h2 style="margin: 0 0 8px 0; font-size: 1.3rem;">Analysis Results</h2>
                                 <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;" id="analyzed-url">Page analyzed: Loading...</p>
-                                <p style="margin: 5px 0 0 0; opacity: 0.8; font-size: 0.8rem;">Analyzing homepage content, SEO signals, and AI discoverability factors.</p>
                             </div>
                             <button class="btn" id="export-btn" style="background: white; color: var(--olive-green-dark); padding: 10px 20px;">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;">
@@ -179,7 +157,7 @@
                                     <line x1="16" y1="13" x2="8" y2="13"/>
                                     <line x1="16" y1="17" x2="8" y2="17"/>
                                 </svg>
-                                Export to Google Docs
+                                Export to Doc
                             </button>
                         </div>
                     </div>
@@ -285,7 +263,8 @@
 
     <footer>
         <div class="container">
-            <p>webWhys — open-source website &amp; competitor analysis · <a href="https://github.com/GLN-rc/nvpmm/tree/main/webWhys" style="color: var(--grey-light); text-decoration: underline;">GitHub</a></p>
+            <p>webWhys | open-source website &amp; competitor analysis | <a href="https://github.com/GLN-rc/nvpmm/tree/main/webWhys" style="color: var(--grey-light); text-decoration: underline;">GitHub</a></p>
+            <p style="font-size: 0.85rem; color: var(--grey-medium); margin-top: 8px;"><a href="https://www.linkedin.com/in/nicolescottfromraleigh/" target="_blank" style="color: var(--grey-medium); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">Minimum Viable Product (Marketing) <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.469v6.766z"/></svg></a></p>
         </div>
     </footer>
 

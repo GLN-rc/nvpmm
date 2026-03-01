@@ -467,20 +467,20 @@ class WebsiteScanner {
                         <div style="font-size: 1.05rem; font-weight: 700;">${readingMins > 0 ? readingMins + ' min' : '< 1 min'}</div>
                         <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">At 200 words/min</div>
                     </div>
-                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">H2 Sections</div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;" title="H2 sections organize content into major topics. More sections = better scanability for humans and AI. Search engines also use these to understand page structure.">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px; cursor: help;">H2 Sections</div>
                         <div style="font-size: 1.05rem; font-weight: 700;" class="${h2Count >= 3 ? 'good' : h2Count > 0 ? 'warning' : 'bad'}">${h2Count}</div>
-                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Aim for 3+ sections</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Main content organization</div>
                     </div>
-                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">H3 Subsections</div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;" title="H3 subsection headings help break up content into logical chunks. More H3s = more granular content structure that AI and search engines can parse better.">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px; cursor: help;">H3 Subsections</div>
                         <div style="font-size: 1.05rem; font-weight: 700;">${h3Count}</div>
-                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Depth within each section</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Granular content structure for AI parsing</div>
                     </div>
-                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">Lists / Bullets</div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;" title="Bulleted and numbered lists are easy for AI to parse and extract. More lists = more structured, machine-readable content. Aim for 2+ lists per page.">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px; cursor: help;">Lists / Bullets</div>
                         <div style="font-size: 1.05rem; font-weight: 700;" class="${listCount >= 2 ? 'good' : listCount > 0 ? 'warning' : 'bad'}">${listCount}</div>
-                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Scannable + AI-extractable</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Easily parsed by AI engines</div>
                     </div>
                     <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
                         <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">Images</div>
@@ -492,10 +492,10 @@ class WebsiteScanner {
                         <div style="font-size: 1.05rem; font-weight: 700;" class="${internalLinks >= 10 ? 'good' : internalLinks > 0 ? 'warning' : 'bad'}">${internalLinks}</div>
                         <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Aim for 10+ for SEO</div>
                     </div>
-                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;">
-                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px;">External Links</div>
+                    <div style="background: var(--table-shade); padding: 12px; border-radius: 6px;" title="E-E-A-T = Expertise, Experience, Authoritativeness, Trustworthiness. External links to authoritative sources signal credibility to Google and AI systems. Aim for 3+ links to trusted sources.">
+                        <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 4px; cursor: help;">External Links</div>
                         <div style="font-size: 1.05rem; font-weight: 700;" class="${externalLinks >= 2 ? 'good' : externalLinks > 0 ? 'warning' : 'bad'}">${externalLinks}</div>
-                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Cite sources for E-E-A-T</div>
+                        <div style="font-size: 0.75rem; color: #888; margin-top: 2px;">Trust signals for Google & AI (E-E-A-T)</div>
                     </div>
                 </div>
             </div>
@@ -922,13 +922,9 @@ class WebsiteScanner {
 
         const kwIntelHtml = sortedKws.length > 0 ? `
             <div style="background: white; border: 1px solid var(--grey-light); border-radius: 8px; padding: 20px; margin-top: 24px;">
-                <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 8px;">
-                    <h4 style="margin: 0; color: var(--headline);">Competitor Keyword Intelligence</h4>
-                    <span style="font-size: 0.72rem; background: var(--table-shade); color: var(--highlight-2); border: 1px solid var(--highlight-2); padding: 2px 10px; border-radius: 10px; font-weight: 600; letter-spacing: 0.03em;">For awareness only — not your copy</span>
-                </div>
+                <h4 style="margin: 0 0 12px 0; color: var(--headline);">Competitor Keyword Intelligence</h4>
                 <p style="font-size: 0.82rem; color: #888; margin: 0 0 16px 0; line-height: 1.5;">
-                    These are the keyword phrases your competitors appear to be optimizing for — sourced from their titles, H1s, H2s, and meta descriptions.
-                    Knowing this helps you understand what search real estate they're targeting. Use it to decide where to <strong>compete</strong>, where to <strong>differentiate</strong>, or where to <strong>flank</strong> — but your copy should still use <em>your</em> brand's language.
+                    Keywords your competitors are targeting from their titles, H1s, and meta descriptions. Use to identify competitive areas and differentiation opportunities.
                 </p>
 
                 ${yourKws.length > 0 ? `
@@ -1000,7 +996,7 @@ class WebsiteScanner {
                     ${s.why ? `
                     <p style="font-size: 0.8rem; color: var(--grey-medium); margin: 0 0 8px 0; border-left: 3px solid var(--table-border); padding-left: 8px; line-height: 1.4;"><em>${s.why}</em></p>` : ''}
                     <div style="margin-top: 6px;">
-                        <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 5px;">Suggested copy — click to copy</div>
+                        <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 5px;">Suggested wording — click to copy</div>
                         ${(s.suggestions || []).map(item => `
                             <div class="copy-item"
                                  onclick="navigator.clipboard.writeText(this.dataset.text); this.classList.add('copy-flash'); setTimeout(() => this.classList.remove('copy-flash'), 1000);"
@@ -1055,7 +1051,12 @@ class WebsiteScanner {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `website-optimization-report-${new Date().toISOString().split('T')[0]}.docx`;
+            // Generate filename in dd-mm-yy format
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = String(now.getFullYear()).slice(-2);
+            a.download = `webWhys-report-${day}-${month}-${year}.docx`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
